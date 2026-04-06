@@ -1,0 +1,8 @@
+Pillow
+faster-whisper
+ctranslate2
+openpyxl
+python-docx
+pdfplumber
+pypdf
+PyPDF2

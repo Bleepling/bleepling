@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Build and packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Installer / packaging leftovers
+pip-wheel-metadata/
+
+# Logs and reports
+*.log
+logs/
+05_logs/
+
+# Test and cache tools
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+
+# Jupyter / editors / OS
+.ipynb_checkpoints/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local project/runtime data
+04_output/
+01_input/
+02_transcription/
+03_processing/
+06_presets/
+99_config/
+
+# Temporary files
+*.tmp
+*.temp
+~$*
+*.bak
+
+# Environment files
+.env
+.env.*
+
+# Optional local archives
+*.zip

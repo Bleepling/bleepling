@@ -182,6 +182,4 @@ Beiträge, Fehlermeldungen und Verbesserungsvorschläge sind willkommen.
 Weitere Hinweise folgen in einer separaten Datei `CONTRIBUTING.md`.
 
 ## Kontakt
-
-Andreas Ritz  
 E-Mail: bleepling@email.de

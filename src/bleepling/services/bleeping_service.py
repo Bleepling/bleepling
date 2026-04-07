@@ -50,38 +50,66 @@ class BleepingService:
         "cuda_extra_paths": "",
     }
 
+
     TITLE_WORDS = {
-        "herr",
-        "herrn",
-        "frau",
-        "dr",
-        "dr.",
-        "prof",
-        "prof.",
-        "professor",
-        "doktor",
-        "minister",
-        "staatsminister",
-        "ministerin",
-        "präsident",
-        "präsidentin",
-        "richter",
-        "richterin",
+        "herr", "herrn", "frau", "dr", "dr.", "prof", "prof.", "professor", "professorin", "doktor",
+        "minister", "ministerin", "staatsminister", "staatsministerin",
+        "richter", "richterin", "vorsitzender", "vorsitzende",
+        "präsident", "präsidentin", "direktor", "direktorin",
+        "staatsanwalt", "staatsanwältin", "justizinspektor", "justizinspektorin",
+        "amtsrat", "amtsrätin", "justizrat", "justizrätin",
     }
 
+    GREETING_WORDS = {"lieber", "liebe", "hallo", "geehrte", "geehrter"}
+
     BAD_NAME_WORDS = {
-        "die", "der", "den", "dem", "des", "eine", "einer", "eines", "einem", "einen",
+        "die", "der", "den", "dem", "des", "ein", "eine", "einer", "eines", "einem", "einen",
         "jetzt", "heute", "morgen", "gestern", "inhalt", "frage", "fragen", "antwort",
         "vorrede", "ki", "justiz", "urteil", "entscheidung", "entscheidungen",
         "ihre", "ihrer", "ihren", "ihrem", "ihrererseits", "sein", "seine", "seiner",
         "das", "dass", "dies", "diese", "dieser", "diesem", "dieses",
         "also", "genug", "pizza", "chat", "wort", "koordinaten", "google",
+        "und", "oder", "aber", "auch", "mit", "ohne", "für", "gegen", "von", "vor", "nach", "bei",
+        "okay", "dank", "ciao", "prima", "gut", "super", "hallo", "tschüss", "tschuess",
+        "preise", "preis", "vorteile", "vorteil", "testlauf", "art", "übersicht", "uebersicht",
+        "ich", "du", "er", "sie", "es", "wir", "ihr", "euch", "dir", "mir", "uns",
+        "ist", "sind", "war", "waren", "heißt", "heisst", "kann", "koennen", "können", "wird", "werden",
+        "hat", "habe", "hatte", "hatten", "weiß", "weiss", "weißt", "weisst", "gibt", "gibts", "was", "irgendwas",
     }
 
     NAME_FOLLOW_VERBS = {
-        "fragt", "frage", "sagt", "meint", "erwähnt", "schreibt",
-        "antwortet", "weist", "meldet", "bemerkt", "erklärt", "hinterfragt",
+        "fragt", "sagt", "meint", "erwähnt", "schreibt", "antwortet", "weist", "meldet",
+        "bemerkt", "erklärt", "hinterfragt", "betont", "erläutert", "ergänzt", "berichtet",
+        "verweist", "schildert", "entgegnet", "erwidert", "kommentiert", "beschreibt",
     }
+
+    CONNECTOR_WORDS = {"am", "im", "des", "der", "bei", "beim"}
+
+    INSTITUTION_WORDS = {
+        "staatsanwaltschaft", "generalstaatsanwaltschaft", "amtsgericht", "landgericht", "oberlandesgericht",
+        "arbeitsgericht", "landesarbeitsgericht", "verwaltungsgericht", "oberverwaltungsgericht",
+        "sozialgericht", "landessozialgericht", "finanzgericht", "verfassungsgerichtshof",
+        "bundesverfassungsgericht", "bundesgerichtshof", "bundesarbeitsgericht",
+        "bundesverwaltungsgericht", "bundessozialgericht", "bundesfinanzhof",
+    }
+
+    SUPPORTIVE_PREV_WORDS = {"dem", "den", "der", "des", "mit", "bei", "beim", "am", "im", "auf", "von"}
+    ARTICLE_PREV_WORDS = {"die", "der", "dem", "den", "des"}
+    VERBISH_FOLLOW_WORDS = {
+        "sagt", "sage", "sagte", "meint", "meine", "meinte", "fragt", "frage", "fragte",
+        "schreibt", "schrieb", "antwortet", "antwortete", "erklärt", "erklaert", "erklärte",
+        "weiß", "weiss", "weißt", "weisst", "hat", "hatte", "arbeitet", "arbeitet", "kommt",
+        "kam", "soll", "sollte", "wird", "war", "ist", "habe", "haben", "hieß", "hies",
+        "reingeschrieben", "steht", "läuft", "laeuft", "genannt", "wurde", "verwiesen", "angeboten",
+    }
+
+    FIRSTNAME_ARTICLE_FOLLOW_WORDS = {
+        "hat", "hatte", "habe", "hieß", "hies", "sagte", "meinte", "schrieb",
+        "reingeschrieben", "arbeitet", "läuft", "laeuft", "verwiesen", "angeboten",
+    }
+
+    FIRSTNAME_COMP_PREV_WORDS = {"dass", "weil", "wenn", "ob"}
+    FIRSTNAME_COMP_FOLLOW_WORDS = {"immer", "auch", "noch", "hat", "hatte", "habe", "war", "ist", "wird"}
 
     def load_lists(self, project: Project) -> tuple[str, str]:
         return (
@@ -240,67 +268,150 @@ class BleepingService:
             for word in segment.get("words", []):
                 if word.get("start") is None or word.get("word") is None:
                     continue
-                words.append(word)
+                cleaned = self.clean_word(str(word["word"]))
+                if not cleaned:
+                    continue
+                words.append({"start": float(word["start"]), "word": cleaned})
         if not words:
             return []
 
-        cleaned_words = [self.clean_word(str(w["word"])) for w in words]
+        tokens = [w["word"] for w in words]
+        lowers = [t.lower() for t in tokens]
         results: list[tuple[str, str, str]] = []
         seen: set[tuple[str, str]] = set()
 
-        for i, token in enumerate(cleaned_words):
-            low = token.lower()
-            if low in self.TITLE_WORDS and i + 1 < len(cleaned_words):
-                j = i + 1
-                while j < len(cleaned_words) and cleaned_words[j].lower() in self.TITLE_WORDS:
-                    j += 1
-                parts: list[str] = []
-                for k in range(j, min(j + 3, len(cleaned_words))):
-                    part = cleaned_words[k]
-                    if self.is_capitalized_name_like(part) and not self.is_bad_name(part):
-                        parts.append(part)
-                    else:
-                        break
-                if parts:
-                    candidate = " ".join(parts)
-                    norm = self.normalize_name(candidate)
-                    if norm:
-                        ts = self.seconds_to_ts(float(words[j]["start"]))
-                        key = (ts, norm)
-                        if key not in seen:
-                            seen.add(key)
-                            results.append((ts, candidate, self.make_context(words, j)))
+        def add_candidate(start_idx: int, candidate: str) -> None:
+            candidate = " ".join(candidate.split()).strip()
+            if not candidate:
+                return
+            norm = self.normalize_name(candidate)
+            if not norm:
+                return
+            ts = self.seconds_to_ts(float(words[start_idx]["start"]))
+            key = (ts, norm)
+            if key in seen:
+                return
+            seen.add(key)
+            results.append((ts, candidate, self.make_context(words, start_idx)))
 
-            if self.is_capitalized_name_like(token) and not self.is_bad_name(token) and i + 1 < len(cleaned_words):
-                next_low = cleaned_words[i + 1].lower()
-                prev_low = cleaned_words[i - 1].lower() if i - 1 >= 0 else ""
-                if next_low in self.NAME_FOLLOW_VERBS and prev_low not in self.TITLE_WORDS:
-                    candidate = token
-                    norm = self.normalize_name(candidate)
-                    if norm:
-                        ts = self.seconds_to_ts(float(words[i]["start"]))
-                        key = (ts, norm)
-                        if key not in seen:
-                            seen.add(key)
-                            results.append((ts, candidate, self.make_context(words, i)))
+        intro_words = self.TITLE_WORDS | self.GREETING_WORDS
 
-        for i, token in enumerate(cleaned_words):
-            if not self.is_capitalized_name_like(token) or self.is_bad_name(token):
+        # starke Anrede-/Titelkontexte
+        for i, low in enumerate(lowers):
+            if low not in intro_words:
                 continue
-            if i + 1 < len(cleaned_words):
-                second = cleaned_words[i + 1]
-                if self.is_capitalized_name_like(second) and not self.is_bad_name(second):
-                    candidate = f"{token} {second}"
-                    norm = self.normalize_name(candidate)
-                    if norm:
-                        ts = self.seconds_to_ts(float(words[i]["start"]))
-                        key = (ts, norm)
-                        if key not in seen:
-                            seen.add(key)
-                            results.append((ts, candidate, self.make_context(words, i)))
+            j = i + 1
+            while j < len(tokens) and lowers[j] in intro_words:
+                j += 1
+            if j >= len(tokens):
+                continue
 
-        results.sort(key=lambda item: item[0])
-        return results
+            # Justiz-Funktionskette bis zum Namensblock
+            if low in self.TITLE_WORDS:
+                k = j
+                while k < len(tokens) and lowers[k] in self.TITLE_WORDS:
+                    k += 1
+                while k < len(tokens) and (lowers[k] in self.CONNECTOR_WORDS or self._is_institution_word(tokens[k])):
+                    k += 1
+                if k < len(tokens) and self._looks_like_name_token(tokens[k], strong=True):
+                    if k + 1 < len(tokens) and self._looks_like_name_token(tokens[k + 1], strong=True):
+                        add_candidate(k, f"{tokens[k]} {tokens[k + 1]}")
+                    add_candidate(k, tokens[k])
+
+            # normaler Anredeblock, bis der nächste Intro-Block beginnt
+            parts: list[str] = []
+            start_idx = None
+            k = j
+            while k < len(tokens) and len(parts) < 2:
+                if lowers[k] in intro_words:
+                    break
+                if self._looks_like_name_token(tokens[k], strong=True):
+                    if start_idx is None:
+                        start_idx = k
+                    parts.append(tokens[k])
+                    k += 1
+                    continue
+                break
+            if parts and start_idx is not None:
+                add_candidate(start_idx, " ".join(parts))
+
+        # einzelner Name vor typischem Folgeverb
+        for i, token in enumerate(tokens[:-1]):
+            if self._looks_like_name_token(token, strong=False) and lowers[i + 1] in self.NAME_FOLLOW_VERBS:
+                add_candidate(i, token)
+
+        # gezielte Vornamenmuster: "von X auf Y"
+        for i in range(len(tokens) - 3):
+            if lowers[i] == "von" and lowers[i + 2] == "auf":
+                if self._is_likely_first_name_token(tokens[i + 1]):
+                    add_candidate(i + 1, tokens[i + 1])
+                if self._is_likely_first_name_token(tokens[i + 3]):
+                    add_candidate(i + 3, tokens[i + 3])
+
+        # gezielte Vornamenmuster: "die/der X hatte ..." oder "dass X immer ..."
+        for i in range(1, len(tokens) - 1):
+            prev_low = lowers[i - 1]
+            next_low = lowers[i + 1]
+            if self._is_likely_first_name_token(tokens[i]):
+                if prev_low in self.ARTICLE_PREV_WORDS and next_low in self.FIRSTNAME_ARTICLE_FOLLOW_WORDS:
+                    add_candidate(i, tokens[i])
+                    continue
+                if prev_low in self.FIRSTNAME_COMP_PREV_WORDS and next_low in self.FIRSTNAME_COMP_FOLLOW_WORDS:
+                    add_candidate(i, tokens[i])
+                    continue
+
+        # freie Vorname-Nachname-Paare
+        blocked_prev = {"ein", "eine", "einem", "einen", "einer", "eines"}
+        for i in range(len(tokens) - 1):
+            first, second = tokens[i], tokens[i + 1]
+            prev_low = lowers[i - 1] if i > 0 else ""
+            if prev_low in blocked_prev:
+                continue
+            if not self._looks_like_name_token(first, strong=False):
+                continue
+            if not self._looks_like_name_token(second, strong=False):
+                continue
+            if self._pair_should_be_blocked(first, second):
+                continue
+            add_candidate(i, f"{first} {second}")
+
+        # bestätigte Namen dateiintern nachverfolgen
+        confirmed_parts: set[str] = set()
+        for _, cand, _ in results:
+            norm = self.normalize_name(cand)
+            if not norm:
+                continue
+            for p in norm.split():
+                if len(p) >= 3 and p not in self.BAD_NAME_WORDS:
+                    confirmed_parts.add(p)
+                    if p.endswith("s") and len(p) >= 4:
+                        confirmed_parts.add(p[:-1])
+                    else:
+                        confirmed_parts.add(p + "s")
+        for i, token in enumerate(tokens):
+            norm_tok = self.normalize_name(token)
+            if not norm_tok or len(norm_tok) < 3 or norm_tok in self.BAD_NAME_WORDS:
+                continue
+            if norm_tok in confirmed_parts and self._looks_like_name_token(token, strong=True):
+                add_candidate(i, token)
+
+        # lokale Konsolidierung: Vollname schlägt Teilname in der Nähe
+        enriched = []
+        for ts, cand, ctx in results:
+            enriched.append((self._ts_to_seconds(ts), ts, cand, ctx, self.normalize_name(cand).split()))
+        keep = [True] * len(enriched)
+        for i, (sec, ts, cand, ctx, parts) in enumerate(enriched):
+            if len(parts) != 1:
+                continue
+            for j, (sec2, ts2, cand2, ctx2, parts2) in enumerate(enriched):
+                if i == j or len(parts2) < 2:
+                    continue
+                if abs(sec - sec2) <= 2.0 and parts[0] in parts2:
+                    keep[i] = False
+                    break
+        filtered = [(ts, cand, ctx) for keep_it, (_, ts, cand, ctx, _) in zip(keep, enriched) if keep_it]
+        filtered.sort(key=lambda item: item[0])
+        return filtered
 
     def build_blocklist_from_candidate_file(self, candidate_file: Path) -> str:
         entries = self.parse_candidate_file(candidate_file)
@@ -401,11 +512,21 @@ class BleepingService:
         name = name.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")
         name = re.sub(r"[^a-z0-9 \-]", "", name)
         name = re.sub(r"\s+", " ", name).strip()
-        for prefix in ("herr ", "frau ", "dr ", "prof ", "professor ", "doktor ", "richter ", "richterin "):
-            if name.startswith(prefix):
-                name = name[len(prefix):].strip()
-        if name.endswith("s") and len(name) > 4:
-            name = name[:-1]
+        changed = True
+        while changed:
+            changed = False
+            for prefix in (
+                "herr ", "herrn ", "frau ", "dr ", "prof ", "professor ", "professorin ", "doktor ",
+                "minister ", "ministerin ", "staatsminister ", "staatsministerin ",
+                "richter ", "richterin ", "vorsitzender ", "vorsitzende ",
+                "präsident ", "präsidentin ", "direktor ", "direktorin ",
+                "staatsanwalt ", "staatsanwältin ", "justizinspektor ", "justizinspektorin ",
+                "amtsrat ", "amtsrätin ", "justizrat ", "justizrätin ",
+                "lieber ", "liebe ", "geehrte ", "geehrter ", "hallo ",
+            ):
+                if name.startswith(prefix):
+                    name = name[len(prefix):].strip()
+                    changed = True
         return name
 
     def clean_word(self, word: str) -> str:
@@ -414,21 +535,76 @@ class BleepingService:
     def is_capitalized_name_like(self, word: str) -> bool:
         return bool(re.match(r"^[A-ZÄÖÜ][A-Za-zÄÖÜäöüß\-]{2,}$", word))
 
+    def _looks_like_name_token(self, word: str, strong: bool = False) -> bool:
+        cleaned = self.clean_word(word)
+        if not cleaned:
+            return False
+        norm = self.normalize_name(cleaned)
+        if len(norm) < 3 or norm in self.BAD_NAME_WORDS:
+            return False
+        if norm in self.CONNECTOR_WORDS:
+            return False
+        if self._is_institution_word(cleaned):
+            return False
+        if strong:
+            return self.is_capitalized_name_like(cleaned)
+        return self.is_capitalized_name_like(cleaned)
+
+    def _looks_like_second_name_token(self, word: str) -> bool:
+        cleaned = self.clean_word(word)
+        if not self._looks_like_name_token(cleaned, strong=False):
+            return False
+        norm = self.normalize_name(cleaned)
+        return len(norm) >= 4
+
+    def _is_likely_first_name_token(self, word: str) -> bool:
+        cleaned = self.clean_word(word)
+        if not self._looks_like_name_token(cleaned, strong=False):
+            return False
+        norm = self.normalize_name(cleaned)
+        if norm in self.TITLE_WORDS or norm in self.CONNECTOR_WORDS or self._is_institution_word(cleaned):
+            return False
+        if len(norm) < 4 or len(norm) > 12:
+            return False
+        return True
+
+    def _pair_should_be_blocked(self, first: str, second: str) -> bool:
+        n1 = self.normalize_name(first)
+        n2 = self.normalize_name(second)
+        if not n1 or not n2:
+            return True
+        if n1 == n2:
+            return True
+        blocked = self.BAD_NAME_WORDS | self.GREETING_WORDS | self.TITLE_WORDS | self.CONNECTOR_WORDS
+        return n1 in blocked or n2 in blocked or n2 in {"ich", "du", "er", "sie", "es", "wir", "ihr"}
+
+    def _is_institution_word(self, word: str) -> bool:
+        norm = self.normalize_name(word)
+        if norm in self.INSTITUTION_WORDS:
+            return True
+        if norm.endswith("s") and norm[:-1] in self.INSTITUTION_WORDS:
+            return True
+        return False
+
     def is_bad_name(self, word: str) -> bool:
         return self.normalize_name(word) in self.BAD_NAME_WORDS
+
+    def seconds_to_ts(self, seconds: float) -> str:
+        total_ms = int(round(seconds * 1000))
+        hours, rem = divmod(total_ms, 3600000)
+        minutes, rem = divmod(rem, 60000)
+        secs, ms = divmod(rem, 1000)
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}.{ms:03d}"
 
     def make_context(self, words: list[dict], index: int, window: int = 10) -> str:
         left = max(0, index - window)
         right = min(len(words), index + window + 1)
         return " ".join(self.clean_word(str(w.get("word", ""))) for w in words[left:right]).strip()
 
-    def seconds_to_ts(self, seconds: float) -> str:
-        total_ms = int(round(seconds * 1000))
-        h = total_ms // 3_600_000
-        m = (total_ms % 3_600_000) // 60_000
-        s = (total_ms % 60_000) // 1000
-        ms = total_ms % 1000
-        return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
+    def _ts_to_seconds(self, timestamp: str) -> float:
+        h, m, rest = timestamp.split(":")
+        s, ms = rest.split(".")
+        return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000.0
 
     def _list_files(self, folder: Path, pattern: str) -> list[Path]:
         if not folder.exists():
@@ -473,17 +649,10 @@ class BleepingService:
             return False
         if any(self.is_bad_name(p) for p in parts):
             return False
-        raw_parts = [part.strip(".,;:!?()[]{}\"'“”‚‘«»") for part in parts]
-        if any(not self.is_capitalized_name_like(p) and p.lower() not in {"herr","frau","dr","prof","doktor","professor","richter","richterin"} for p in raw_parts):
-            return False
-        c = f" {context.lower()} "
-        if any(f" {title} " in c for title in ["herr", "herrn", "frau", "doktor", "dr", "professor", "prof", "richter", "richterin", "präsident", "präsidentin", "minister", "ministerin", "staatsminister"]):
-            return True
-        if len(raw_parts) == 1 and self.is_capitalized_name_like(raw_parts[0]) and not self.is_bad_name(raw_parts[0]):
-            return True
-        if len(raw_parts) == 2 and all(self.is_capitalized_name_like(p) and not self.is_bad_name(p) for p in raw_parts):
-            return True
-        return False
+        if len(parts) == 1:
+            return self._looks_like_name_token(parts[0], strong=True)
+        return all(self._looks_like_name_token(p, strong=True) for p in parts)
+
     def _prepare_name_list(self, text: str) -> list[str]:
         values = []
         for line in text.splitlines():
@@ -495,13 +664,19 @@ class BleepingService:
     def _best_match(self, candidate: str, values: list[str]) -> tuple[str | None, int]:
         best_value = None
         best_score = 0
+        variants = {candidate}
+        if candidate.endswith("s") and len(candidate) > 4:
+            variants.add(candidate[:-1])
+        else:
+            variants.add(candidate + "s")
         for value in values:
-            score = int(round(SequenceMatcher(None, candidate, value).ratio() * 100))
-            if candidate == value:
-                score = 100
-            if score > best_score:
-                best_value = value
-                best_score = score
+            for cand in variants:
+                score = int(round(SequenceMatcher(None, cand, value).ratio() * 100))
+                if cand == value:
+                    score = 100
+                if score > best_score:
+                    best_value = value
+                    best_score = score
         return best_value, best_score
 
     def _normalize_multiline_text(self, text: str) -> str:

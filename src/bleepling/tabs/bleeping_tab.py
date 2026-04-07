@@ -33,6 +33,7 @@ try:
 except Exception:
     Image = None
     ImageTk = None
+from bleepling.services.bleeping_service import BleepingService
 
 
 def _safe_read_lines(path: Path):
@@ -362,6 +363,7 @@ class BleepingTab(ttk.Frame):
         self._external_set_status = set_status
         self.progress_win = None
         self.progress_img = None
+        self.bleeping_service = BleepingService()
         self._build()
 
     def _asset(self, name: str) -> Path:
@@ -602,6 +604,15 @@ class BleepingTab(ttk.Frame):
             self.preview.heading(c, text=c.capitalize())
             self.preview.column(c, width=w, anchor="w")
         self.preview.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        self._preview_anchor = None
+        self.preview.bind("<Button-1>", self._on_preview_click, add="+")
+        self.preview.bind("<Control-a>", self._select_all_preview_rows, add="+")
+        self.preview.bind("<Control-A>", self._select_all_preview_rows, add="+")
+        try:
+            self.bind_all("<Control-a>", self._select_all_preview_rows, add="+")
+            self.bind_all("<Control-A>", self._select_all_preview_rows, add="+")
+        except Exception:
+            pass
 
         statusf = ttk.LabelFrame(self, text="Status und Hinweise")
         statusf.pack(fill="x", padx=8, pady=(0, 8))
@@ -791,48 +802,13 @@ class BleepingTab(ttk.Frame):
                 self._set_status(f"words.json nicht gefunden: {json_path.name}")
                 return
 
-            out_name = json_path.stem.replace(".words", "") + "_NAMEN_KANDIDATEN_auto.txt"
-            out_path = self.app.project.candidates_raw_dir / out_name
-
-            rows = []
-            data = json.loads(json_path.read_text(encoding="utf-8", errors="ignore"))
-            segments = data.get("segments", []) or []
-            words = []
-
-            for seg in segments:
-                seg_text = str(seg.get("text", "")).strip()
-                for w in seg.get("words", []) or []:
-                    token = _clean_token(w.get("word", ""))
-                    if token:
-                        words.append((token, float(w.get("start", seg.get("start", 0))), seg_text))
-
-            i = 0
-            while i < len(words):
-                tok, start, ctx = words[i]
-                clean = tok.replace(".", "")
-                if clean in TITLES and i + 1 < len(words):
-                    nxt = words[i + 1][0]
-                    if _looks_like_name(nxt):
-                        rows.append((start, nxt, ctx))
-                        i += 2
-                        continue
-                i += 1
-
-            seen = set()
-            lines = []
-            for start, cand, ctx in rows:
-                key = (_format_ts(start), cand.lower())
-                if key in seen:
-                    continue
-                seen.add(key)
-                lines.append(f"{_format_ts(start)} | {cand} | {' '.join(ctx.split())[:220]}")
-
-            _safe_write_lines(out_path, lines)
+            out_path = self.bleeping_service.generate_candidate_file_from_words_json(self.app.project, json_path)
             self.refresh()
             self.candidate_var.set(out_path.name)
 
             if not auto_only:
-                self._set_status(f"Kandidaten-Datei erzeugt: {out_path.name}\nTreffer: {len(lines)}")
+                entry_count = len(self.bleeping_service.parse_candidate_file(out_path))
+                self._set_status(f"Kandidaten-Datei erzeugt: {out_path.name}\nTreffer: {entry_count}")
         except Exception as e:
             self._set_status(f"Kandidaten aus words.json erzeugen fehlgeschlagen: {e}")
 
@@ -857,39 +833,79 @@ class BleepingTab(ttk.Frame):
             return
 
         path = self.app.project.candidates_raw_dir / self.candidate_var.get()
-        blocklist = [x.strip() for x in self.block_text.get("1.0", "end").splitlines() if x.strip()]
-        allowlist = [x.strip() for x in self.allow_text.get("1.0", "end").splitlines() if x.strip()]
+        blocklist_text = self.block_text.get("1.0", "end")
+        allowlist_text = self.allow_text.get("1.0", "end")
         block_thr = int(self.block_thr.get())
         allow_thr = int(self.allow_thr.get())
 
-        preview_rows = []
-        for line in _safe_read_lines(path):
-            parts = [p.strip() for p in line.split("|", 2)]
-            if len(parts) < 3:
-                continue
-            ts, cand, ctx = parts[0], parts[1], parts[2]
-
-            allow_match, allow_score = _best_match(cand, allowlist) if allowlist else ("", 0)
-            if allow_score >= allow_thr:
-                preview_rows.append((ts, cand, "erlaubt", f"Allowlist-Fuzzy: {allow_match} ({allow_score}%)", ctx))
-                continue
-
-            if blocklist:
-                block_match, block_score = _best_match(cand, blocklist)
-                if block_score >= block_thr:
-                    preview_rows.append((ts, cand, "bleepen", f"Blocklist-Fuzzy: {block_match} ({block_score}%)", ctx))
-            else:
-                preview_rows.append((ts, cand, "prüfen", "Blocklist leer: automatisch zur Prüfung vorgemerkt", ctx))
+        entries = self.bleeping_service.parse_candidate_file(path)
+        decisions = self.bleeping_service.evaluate_candidates(
+            entries=entries,
+            blocklist_text=blocklist_text,
+            allowlist_text=allowlist_text,
+            blocklist_threshold=block_thr,
+            allowlist_threshold=allow_thr,
+        )
 
         for i in self.preview.get_children():
             self.preview.delete(i)
-        for row in preview_rows:
-            self.preview.insert("", "end", values=row)
 
+        visible_count = 0
+        for item in decisions:
+            if item.decision == "ignorieren":
+                continue
+            self.preview.insert(
+                "",
+                "end",
+                values=(item.timestamp, item.candidate, item.decision, item.reason, item.context),
+            )
+            visible_count += 1
+
+        summary = self.bleeping_service.summarize_decisions(decisions)
         self._set_status(
-            f"Auswertung abgeschlossen. Treffer in Vorschau: {len(preview_rows)}\n"
-            f"Verwendete Blocklist-Einträge: {len(blocklist)} | Allowlist-Einträge: {len(allowlist)}"
+            f"Auswertung abgeschlossen. Vorschau: {visible_count} | Gesamt: {summary.get('gesamt', 0)} | "
+            f"Bleepen: {summary.get('bleepen', 0)} | Erlaubt: {summary.get('erlaubt', 0)} | "
+            f"Prüfen: {summary.get('prüfen', 0)} | Ignorieren: {summary.get('ignorieren', 0)}"
         )
+    def _select_all_preview_rows(self, event=None):
+        items = self.preview.get_children("")
+        if items:
+            self.preview.selection_set(items)
+            self._preview_anchor = items[0]
+        return "break"
+
+    def _on_preview_click(self, event):
+        region = self.preview.identify("region", event.x, event.y)
+        if region not in {"tree", "cell"}:
+            return
+
+        iid = self.preview.identify_row(event.y)
+        if not iid:
+            return
+
+        ctrl_pressed = bool(event.state & 0x0004)
+        shift_pressed = bool(event.state & 0x0001)
+        items = list(self.preview.get_children(""))
+
+        if shift_pressed and self._preview_anchor in items:
+            start = items.index(self._preview_anchor)
+            end = items.index(iid)
+            lo, hi = sorted((start, end))
+            self.preview.selection_set(items[lo:hi + 1])
+        elif ctrl_pressed:
+            current = set(self.preview.selection())
+            if iid in current:
+                current.remove(iid)
+            else:
+                current.add(iid)
+                self._preview_anchor = iid
+            self.preview.selection_set(list(current))
+        else:
+            self.preview.selection_set((iid,))
+            self._preview_anchor = iid
+
+        self.preview.focus(iid)
+        return "break"
 
     def _set_selected_result(self, result_text: str, rule_text: str):
         selected = self.preview.selection()

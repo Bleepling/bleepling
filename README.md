@@ -1,8 +1,12 @@
 # Bleepling
 
-Bleepling ist eine lokal laufende Open-Source-Anwendung zur Anonymisierung von Audio- und Videodateien durch gezieltes Bleeping von gesprochenen Klarnamen.
+Bleepling is a locally running open-source application designed to anonymize audio and video files by selectively bleeping out spoken real names.
+The application supports a transparent review workflow: Transcription data is generated from a video or audio source, potential names are identified from this data, reviewed by the user, and then used in the form of a Times file for the final bleep export.
+Note: The project documentation is currently available only in German.
 
-Die Anwendung unterstützt einen nachvollziehbaren Prüf-Workflow: Aus einem Video oder einer Audioquelle werden Transkriptionsdaten erzeugt, daraus Kandidaten für mögliche Namensnennungen abgeleitet, diese werden menschlich geprüft und anschließend in Form einer Times-Datei für den finalen Bleep-Export verwendet.
+Bleepling ist eine lokal laufende Open-Source-Anwendung zur Anonymisierung von Audio- und Videodateien durch gezieltes Bleeping von gesprochenen Klarnamen.
+Die Anwendung unterstützt einen nachvollziehbaren Prüf-Workflow: Aus einem Video oder einer Audioquelle werden Transkriptionsdaten erzeugt, daraus Kandidaten für mögliche Namensnennungen abgeleitet, diese werden durch den User geprüft und anschließend in Form einer Times-Datei für den finalen Bleep-Export verwendet.
+Hinweis: Die Projektdokumentation ist derzeit überwiegend auf Deutsch verfügbar.
 
 ## Hauptfunktionen
 
@@ -182,6 +186,5 @@ Beiträge, Fehlermeldungen und Verbesserungsvorschläge sind willkommen.
 Weitere Hinweise folgen in einer separaten Datei `CONTRIBUTING.md`.
 
 ## Kontakt
-
-Andreas Ritz  
+**Andreas Ritz**  
 E-Mail: bleepling@email.de

@@ -42,7 +42,8 @@ Bei wiederholten oder schweren Verstößen kann die weitere Mitarbeit oder Teiln
 
 Wenn es im Zusammenhang mit dem Verhalten anderer Beteiligter Probleme gibt, wende dich bitte an:
 
-**Andreas Ritz**  
+**Andreas Ritz**
+
 E-Mail: bleepling@email.de
 
 ## Grundsatz

@@ -9,7 +9,9 @@ from bleepling.tabs.media_tab import MediaTab
 from bleepling.tabs.bleeping_tab import BleepingTab
 from bleepling.tabs.ffmpeg_tab import FFmpegTab
 from bleepling.tabs.targeted_edit_tab import TargetedEditTab
+from bleepling.tabs.hit_review_tab import HitReviewTab
 from bleepling.tabs.settings_tab import SettingsTab
+from bleepling.tabs.combined_review_tab import CombinedReviewTab
 from PIL import Image, ImageTk
 
 
@@ -17,7 +19,7 @@ class BleeplingApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Bleepling – names out, privacy in")
-        self.geometry("1600x1040")
+        self.geometry("1860x1300")
         self.minsize(1200, 860)
         self.project = None
         self.logo_img = None
@@ -132,12 +134,14 @@ class BleeplingApp(tk.Tk):
         self.bleeping_tab = BleepingTab(self.notebook, self)
         self.ffmpeg_tab = FFmpegTab(self.notebook, self)
         self.targeted_edit_tab = TargetedEditTab(self.notebook, self)
+        self.hit_review_tab = HitReviewTab(self.notebook, self)
+        self.combined_review_tab = CombinedReviewTab(self.notebook, self)
         self.settings_tab = SettingsTab(self.notebook, self)
 
         for txt, tab in [
             ("Projekt", self.project_tab),
             ("Medien", self.media_tab),
-            ("Bleeping", self.bleeping_tab),
+            ("Prüfen & Entscheiden", self.combined_review_tab),
             ("Video & Audio / FFmpeg", self.ffmpeg_tab),
             ("Gezielte Nachbearbeitung", self.targeted_edit_tab),
             ("Einstellungen / Logs", self.settings_tab),
@@ -156,6 +160,8 @@ class BleeplingApp(tk.Tk):
             self.bleeping_tab,
             self.ffmpeg_tab,
             self.targeted_edit_tab,
+            self.hit_review_tab,
+            self.combined_review_tab,
             self.settings_tab,
         ]:
             try:

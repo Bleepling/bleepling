@@ -78,6 +78,34 @@ def _safe_int(value, default=0):
     except Exception:
         return default
 
+def _parse_hhmmss_to_seconds(value: str) -> float | None:
+    try:
+        parts = value.strip().split(":")
+        if len(parts) != 3:
+            return None
+        h = int(parts[0]); mm = int(parts[1]); sec = float(parts[2])
+        return h * 3600 + mm * 60 + sec
+    except Exception:
+        return None
+
+def _parse_times_line(line: str):
+    raw = (line or "").strip()
+    if not raw:
+        return None
+    if "-->" in raw:
+        left, right = [x.strip() for x in raw.split("-->", 1)]
+        start = _parse_hhmmss_to_seconds(left)
+        end = _parse_hhmmss_to_seconds(right)
+        if start is None or end is None:
+            return None
+        if end < start:
+            start, end = end, start
+        return start, end
+    center = _parse_hhmmss_to_seconds(raw)
+    if center is None:
+        return None
+    return center, None
+
 def _fps_from_ratio(ratio: str) -> float:
     try:
         if "/" in ratio:
@@ -335,14 +363,12 @@ class FFmpegTab(ttk.Frame):
 
         bleepf = ttk.LabelFrame(self, text="Bleep-Parameter")
         bleepf.pack(fill="x", padx=10, pady=(0, 10))
-        ttk.Label(bleepf, text="Bleep-Frequenz (Hz)").grid(row=0, column=0, sticky="w", padx=8, pady=4)
-        ttk.Spinbox(bleepf, from_=400, to=3000, increment=50, textvariable=self.bleep_freq_var, width=8).grid(row=0, column=1, sticky="w", padx=8, pady=4)
-        ttk.Label(bleepf, text="Bleep-Lautstärke (0.0 - 1.0)").grid(row=0, column=2, sticky="w", padx=8, pady=4)
-        ttk.Spinbox(bleepf, from_=0.1, to=1.0, increment=0.05, textvariable=self.bleep_gain_var, width=8).grid(row=0, column=3, sticky="w", padx=8, pady=4)
-        ttk.Label(bleepf, text="Vorlauf (ms)").grid(row=0, column=4, sticky="w", padx=8, pady=4)
-        ttk.Spinbox(bleepf, from_=0, to=3000, increment=10, textvariable=self.bleep_pre_ms_var, width=8).grid(row=0, column=5, sticky="w", padx=8, pady=4)
-        ttk.Label(bleepf, text="Nachlauf (ms)").grid(row=0, column=6, sticky="w", padx=8, pady=4)
-        ttk.Spinbox(bleepf, from_=0, to=4000, increment=10, textvariable=self.bleep_post_ms_var, width=8).grid(row=0, column=7, sticky="w", padx=8, pady=4)
+        ttk.Label(
+            bleepf,
+            text="Die Bleep-Parameter werden im Reiter 'Prüfen & Entscheiden' festgelegt und von dort für das Rendern übernommen.",
+            wraplength=1200,
+            justify="left",
+        ).pack(anchor="w", padx=8, pady=8)
 
         runf = ttk.LabelFrame(self, text="Rendern")
         runf.pack(fill="x", padx=10, pady=(0, 10))
@@ -520,14 +546,20 @@ class FFmpegTab(ttk.Frame):
         pre = int(self.bleep_pre_ms_var.get()) / 1000.0
         post = int(self.bleep_post_ms_var.get()) / 1000.0
         parsed = []
-        for i, ts in enumerate(times):
-            parts = ts.split(":")
-            if len(parts) != 3:
+        interval_mode = False
+        for i, line in enumerate(times):
+            parsed_line = _parse_times_line(line)
+            if not parsed_line:
                 continue
-            h = int(parts[0]); mm = int(parts[1]); sec = float(parts[2])
-            center = h * 3600 + mm * 60 + sec
-            start = max(0.0, center - pre)
-            end = center + post
+            start_or_center, maybe_end = parsed_line
+            if maybe_end is None:
+                center = start_or_center
+                start = max(0.0, center - pre)
+                end = center + post
+            else:
+                interval_mode = True
+                start = max(0.0, start_or_center)
+                end = max(start + 0.03, maybe_end)
             dur = max(0.08, end - start if end > start else 0.35)
             parsed.append((i, start, end, dur))
         if not parsed:
@@ -543,7 +575,7 @@ class FFmpegTab(ttk.Frame):
             items.append(f"sine=f={freq}:sample_rate=48000:d={dur:.3f},volume={gain},adelay={int(start*1000)}:all=1[b{idx}]")
         amix_inputs = "[muted]" + "".join(f"[b{idx}]" for idx, *_ in parsed)
         items.append(f"{amix_inputs}amix=inputs={1+len(parsed)}:normalize=0[aout]")
-        return ";".join(items), len(parsed)
+        return ";".join(items), len(parsed), interval_mode
 
     def preview_command(self):
         try:
@@ -552,7 +584,7 @@ class FFmpegTab(ttk.Frame):
                 raise RuntimeError("FFmpeg wurde nicht gefunden.")
             p, media, times, output_name = self._get_paths()
             is_audio = media.suffix.lower() in {".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg"} or not self.media_info.get("has_video", True)
-            audio_filter, count = self._audio_filter_from_times(times)
+            audio_filter, count, interval_mode = self._audio_filter_from_times(times)
             if is_audio:
                 out_dir = self._output_audio_dir(p)
                 ext = ".mp3" if AUDIO_CODEC_OPTIONS.get(self.audio_codec_display.get(), "aac") == "mp3" else ".m4a"
@@ -663,8 +695,8 @@ class FFmpegTab(ttk.Frame):
     def _render_worker_video(self, media, times, out):
         try:
             ffmpeg = self._ffmpeg(); out_dir = out.parent; out_dir.mkdir(parents=True, exist_ok=True)
-            audio_filter, count = self._audio_filter_from_times(times); temp_audio = out_dir / (out.stem + ".tmp_bleep.wav")
-            self.render_queue.put({"kind":"progress","percent":2.0,"label":f"Schritt 1/2: Audio wird gebleept ({count} Bleep(s))"})
+            audio_filter, count, interval_mode = self._audio_filter_from_times(times); temp_audio = out_dir / (out.stem + ".tmp_bleep.wav")
+            self.render_queue.put({"kind":"progress","percent":2.0,"label":f"Schritt 1/2: Audio wird gebleept ({count} Bleep(s), {'Intervall-Times' if interval_mode else 'Punkt-Times'})"})
             cmd1 = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(media), "-filter_complex", audio_filter, "-map", "[aout]", "-c:a", "pcm_s16le", str(temp_audio)]
             res1 = self._run_simple_cmd(cmd1)
             if res1.returncode != 0: raise RuntimeError((res1.stderr or res1.stdout or "Fehler in Schritt 1")[:5000])
@@ -688,8 +720,8 @@ class FFmpegTab(ttk.Frame):
     def _render_worker_audio(self, media, times, out):
         try:
             ffmpeg = self._ffmpeg(); out.parent.mkdir(parents=True, exist_ok=True)
-            audio_filter, count = self._audio_filter_from_times(times)
-            self.render_queue.put({"kind":"progress","percent":5.0,"label":f"Audio wird gebleept ({count} Bleep(s))"})
+            audio_filter, count, interval_mode = self._audio_filter_from_times(times)
+            self.render_queue.put({"kind":"progress","percent":5.0,"label":f"Audio wird gebleept ({count} Bleep(s), {'Intervall-Times' if interval_mode else 'Punkt-Times'})"})
             cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(media), "-filter_complex", audio_filter, "-map", "[aout]"]
             if AUDIO_CODEC_OPTIONS.get(self.audio_codec_display.get(), "aac") == "mp3": cmd += ["-c:a", "libmp3lame", "-b:a", self.audio_bitrate_var.get()]
             else: cmd += ["-c:a", "aac", "-b:a", self.audio_bitrate_var.get()]

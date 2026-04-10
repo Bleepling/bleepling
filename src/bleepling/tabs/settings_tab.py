@@ -28,7 +28,7 @@ class SettingsTab(ttk.Frame):
         self.environment_service = EnvironmentService()
         self._details = {}
 
-        frm = ttk.LabelFrame(self, text="Transkription, GPU und Darstellung")
+        frm = ttk.LabelFrame(self, text="Transkription, GPU, VLC und Darstellung")
         frm.pack(fill="x", padx=12, pady=12)
 
         self.mode = tk.StringVar(value="auto")
@@ -82,10 +82,10 @@ class SettingsTab(ttk.Frame):
         ]:
             ttk.Button(row3, text=txt, command=cmd, style="Accent.TButton").pack(side="left", padx=(0, 8))
 
-        self.tree = ttk.Treeview(self, columns=("pruefpunkt", "status"), show="headings", height=12)
+        self.tree = ttk.Treeview(self, columns=("pruefpunkt", "status"), show="headings", height=16)
         self.tree.heading("pruefpunkt", text="Prüfpunkt")
         self.tree.heading("status", text="Status")
-        self.tree.column("pruefpunkt", width=280, anchor="w")
+        self.tree.column("pruefpunkt", width=320, anchor="w")
         self.tree.column("status", width=100, anchor="center")
         self.tree.pack(fill="both", expand=False, padx=12, pady=(0, 12))
         self.tree.bind("<<TreeviewSelect>>", self.show_detail)
@@ -95,12 +95,11 @@ class SettingsTab(ttk.Frame):
         self.detail.pack(fill="both", expand=True, padx=12, pady=(0, 12))
 
         ttk.Label(self, text="Hilfe in normalem Deutsch").pack(anchor="w", padx=12)
-        self.helpbox = tk.Text(self, height=8, wrap="word")
+        self.helpbox = tk.Text(self, height=9, wrap="word")
         self.helpbox.pack(fill="x", padx=12, pady=(0, 12))
         self.helpbox.insert("1.0", "Hier erscheinen einfache Erklärungen und konkrete Hinweise.")
         self.helpbox.config(state="disabled")
         self._bind_live_updates()
-
 
     def _apply_preview(self, *_):
         try:
@@ -125,6 +124,7 @@ class SettingsTab(ttk.Frame):
     def _bind_live_updates(self):
         self.theme.trace_add("write", self._apply_preview)
         self.ui_scale.trace_add("write", self._apply_preview)
+
     def refresh(self):
         if not self.app.project:
             return
@@ -176,21 +176,28 @@ class SettingsTab(ttk.Frame):
             iid = self.tree.insert("", "end", values=(item.name, item.status))
             self._details[iid] = item.details
         self._set_help(
-            "So gehen Sie am einfachsten vor:\\n"
-            "1) Klicken Sie auf 'Prüfung ausführen'.\\n"
-            "2) Wählen Sie in der Liste den fehlenden oder problematischen Punkt an.\\n"
-            "3) Lesen Sie unten die Details.\\n"
-            "4) Fehlen Python-Bausteine, kopieren Sie den Installationsbefehl und fügen ihn dort in CMD ein.\\n"
-            "5) Fehlen GPU-Dateien, tragen Sie den passenden Ordner bei 'Zusätzliche CUDA-Pfade' ein.\\n"
-            "6) Klicken Sie danach auf 'Prüfung erneut ausführen'.\\n\\n"
-            "Empfehlung für Ihren Rechner:\\n"
-            "- Transkriptionsmodus: auto oder gpu\\n"
-            "- Whisper-Modell: Ausgewogen\\n"
-            "- Compute-Type: float16\\n"
-            "- Render-Backend: auto oder gpu\\n"
+            "So gehen Sie am einfachsten vor:\n"
+            "1) Klicken Sie auf 'Prüfung ausführen'.\n"
+            "2) Wählen Sie in der Liste den fehlenden oder problematischen Punkt an.\n"
+            "3) Lesen Sie unten die Details.\n"
+            "4) Fehlen Python-Bausteine, kopieren Sie den Installationsbefehl und fügen ihn in CMD ein.\n"
+            "5) Fehlt VLC, installieren Sie die normale VLC-Desktop-App und danach python-vlc.\n"
+            "6) Fehlen GPU-Dateien, tragen Sie den passenden Ordner bei 'Zusätzliche CUDA-Pfade' ein.\n"
+            "7) Klicken Sie danach auf 'Prüfung erneut ausführen'.\n\n"
+            "Für den neuen Reiter 'Treffer prüfen' sollten mindestens diese Punkte auf ok stehen:\n"
+            "- Python-Modul python-vlc\n"
+            "- VLC Desktop-App\n"
+            "- libvlc.dll\n"
+            "- VLC-Plugins\n"
+            "- VLC-Probe\n\n"
+            "Empfehlung für Ihren Rechner:\n"
+            "- Transkriptionsmodus: auto oder gpu\n"
+            "- Whisper-Modell: Ausgewogen\n"
+            "- Compute-Type: float16\n"
+            "- Render-Backend: auto oder gpu\n"
             "- Textgröße: normal oder etwas größer"
         )
-        self.app.set_status("Prüfung für Transkription und GPU aktualisiert.")
+        self.app.set_status("Prüfung für Transkription, GPU und VLC aktualisiert.")
 
     def show_detail(self, event=None):
         sel = self.tree.selection()
@@ -209,15 +216,14 @@ class SettingsTab(ttk.Frame):
         self.helpbox.insert("1.0", text)
         self.helpbox.config(state="disabled")
 
-
     def run_install_cmd(self):
         cmd = self.environment_service.get_install_command()
         try:
-            # cmd.exe /k erwartet den Befehl am zuverlässigsten als zusammenhängende Zeichenkette.
             subprocess.Popen(f'cmd.exe /k {cmd}', shell=True)
             self._set_help(
                 "Ein neues CMD-Fenster wurde geöffnet und der Installationsbefehl wurde dort gestartet. "
-                "Das Fenster bleibt offen, damit Sie die Ausgabe und eventuelle Fehlermeldungen lesen können."
+                "Das Fenster bleibt offen, damit Sie die Ausgabe und eventuelle Fehlermeldungen lesen können. "
+                "Der Befehl versucht zuerst VLC per winget zu installieren und danach die nötigen Python-Pakete einschließlich python-vlc."
             )
             self.app.set_status("Installations-CMD in neuem Fenster gestartet.")
         except Exception as exc:
@@ -230,7 +236,10 @@ class SettingsTab(ttk.Frame):
     def copy_install(self):
         self.clipboard_clear()
         self.clipboard_append(self.environment_service.get_install_command())
-        self._set_help("Der Installationsbefehl wurde kopiert. Öffnen Sie die Eingabeaufforderung und fügen Sie ihn dort ein.")
+        self._set_help(
+            "Der Installationsbefehl wurde kopiert. Er versucht zuerst VLC per winget zu installieren und danach die benötigten Python-Pakete einschließlich python-vlc. "
+            "Öffnen Sie die Eingabeaufforderung und fügen Sie ihn dort ein."
+        )
 
     def copy_path(self):
         self.clipboard_clear()

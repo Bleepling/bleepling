@@ -45,7 +45,7 @@ Sicherheitsmeldungen sollen nach Möglichkeit zeitnah geprüft und eingeordnet w
 
 ## Unterstützte Versionen
 
-Da sich Bleepling derzeit in aktiver Weiterentwicklung befindet, gilt im Zweifel nur der jeweils aktuelle veröffentlichte Projektstand als aktiv unterstützt.
+Aktiv unterstützt wird im Zweifel nur der jeweils aktuelle veröffentlichte Projektstand. Für das anstehende Release ist dies der Stand **1.2.0**.
 
 Ältere Zwischenstände, experimentelle Branches oder lokale Testfassungen können von dieser Unterstützung abweichen.
 

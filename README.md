@@ -1,12 +1,8 @@
 # Bleepling
 
-Bleepling is a locally running open-source application designed to anonymize audio and video files by selectively bleeping out spoken real names.
-The application supports a transparent review workflow: Transcription data is generated from a video or audio source, potential names are identified from this data, reviewed by the user, and then used in the form of a Times file for the final bleep export.
-Note: The project documentation is currently available only in German.
-
 Bleepling ist eine lokal laufende Open-Source-Anwendung zur Anonymisierung von Audio- und Videodateien durch gezieltes Bleeping von gesprochenen Klarnamen.
-Die Anwendung unterstützt einen nachvollziehbaren Prüf-Workflow: Aus einem Video oder einer Audioquelle werden Transkriptionsdaten erzeugt, daraus Kandidaten für mögliche Namensnennungen abgeleitet, diese werden durch den User geprüft und anschließend in Form einer Times-Datei für den finalen Bleep-Export verwendet.
-Hinweis: Die Projektdokumentation ist derzeit überwiegend auf Deutsch verfügbar.
+
+Die Anwendung unterstützt einen nachvollziehbaren Prüf-Workflow: Aus einem Video oder einer Audioquelle werden Transkriptionsdaten erzeugt, daraus Kandidaten für mögliche Namensnennungen abgeleitet, diese werden menschlich geprüft und anschließend in Form einer Times-Datei für den finalen Bleep-Export verwendet.
 
 ## Hauptfunktionen
 
@@ -15,7 +11,8 @@ Hinweis: Die Projektdokumentation ist derzeit überwiegend auf Deutsch verfügba
 - Transkription mit Whisper beziehungsweise faster-whisper
 - Erzeugung und Prüfung zeitgestempelter Kandidaten-Dateien
 - Arbeit mit Blocklist, Allowlist und Teilnehmerlisten
-- Erzeugung von Times-Dateien für gezielte Bleeps
+- kombinierter Prüf- und Entscheidungsworkflow im Reiter **„Prüfen & Entscheiden“**
+- Erzeugung von Times-Dateien mit Intervallen für gezielte Bleeps
 - finaler Export gebleepter Video- oder Audiodateien über FFmpeg
 - gezielte Nachbearbeitung bereits erzeugter Medien
 - Einstellungs- und Log-Bereich für Prüfung, Installation und Fehlersuche
@@ -59,6 +56,19 @@ Für den vollständigen Funktionsumfang werden insbesondere benötigt:
 Für GPU-beschleunigte Transkription oder bestimmte Hardware-Setups können zusätzlich NVIDIA-CUDA- und cuDNN-Komponenten erforderlich sein.
 
 Diese Komponenten sind **nicht Bestandteil dieses Projekts** und müssen bei Bedarf separat installiert werden.
+
+## Reiter im Überblick
+
+Der Arbeitsstand 1.2.0 verwendet insbesondere diese sichtbaren Reiter:
+
+- **Projekt** – Projekt anlegen, laden und verwalten
+- **Medien** – Video- und WAV-Dateien ins Projekt übernehmen
+- **Prüfen & Entscheiden** – Vorbereitung, Namenslisten, Kandidatenprüfung, Audio-Feinprüfung, Bleep-Parameter und Times-Ableitung
+- **Video & Audio / FFmpeg** – finaler Export gebleepter Video- oder Audiodateien
+- **Gezielte Nachbearbeitung** – zusätzliche Einzel-Bleeps sowie Vor- und Nachspannbilder
+- **Einstellungen / Logs** – technische Prüfung, Diagnose und Unterstützung bei Installationsschritten
+
+Die früheren Reiter **„Bleeping“** und **„Treffer prüfen“** sind im sichtbaren Workflow durch den kombinierten Reiter **„Prüfen & Entscheiden“** ersetzt worden.
 
 ## Einstellungen / Logs
 
@@ -139,13 +149,15 @@ python -m bleepling.app
 
 1. Projekt anlegen oder laden
 2. Video oder WAV-Datei importieren
-3. WAV erzeugen, falls nur ein Video vorliegt
+3. im Reiter **„Prüfen & Entscheiden“** eine WAV erzeugen, falls nur ein Video vorliegt
 4. `words.json` aus WAV erzeugen
 5. Kandidaten-Datei erzeugen
-6. Kandidaten prüfen und Vorschau bewerten
-7. Times-Datei erzeugen
-8. gebleepte Audio- oder Videodatei exportieren
-9. Ergebnis manuell kontrollieren
+6. Blocklist, Allowlist und Teilnehmerlisten pflegen, falls sinnvoll
+7. Kandidaten auswerten, Treffer im Audio prüfen und erforderlichenfalls feinjustieren
+8. Bleep-Parameter im Reiter **„Prüfen & Entscheiden“** festlegen und anwenden
+9. Times-Datei mit Intervallen ableiten
+10. gebleepte Audio- oder Videodatei über **„Video & Audio / FFmpeg“** exportieren
+11. Ergebnis manuell kontrollieren
 
 ## Unterstützte Eingaben
 
@@ -186,5 +198,6 @@ Beiträge, Fehlermeldungen und Verbesserungsvorschläge sind willkommen.
 Weitere Hinweise folgen in einer separaten Datei `CONTRIBUTING.md`.
 
 ## Kontakt
-**Andreas Ritz**  
+
+Andreas Ritz  
 E-Mail: bleepling@email.de

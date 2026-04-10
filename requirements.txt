@@ -6,3 +6,4 @@ python-docx
 pdfplumber
 pypdf
 PyPDF2
+python-vlc

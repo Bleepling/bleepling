@@ -59,7 +59,19 @@ Nach aktuellem Projektstand werden insbesondere folgende Python-Pakete verwendet
 - Projekt: PyPDF2
 - Lizenz: BSD-3-Clause
 
+### python-vlc
+- Zweck: Python-Bindings für libVLC zur eingebetteten Vorschau und Wiedergabe
+- Projekt: python-vlc
+- Lizenz: LGPL-2.1-or-later
+- Hinweis: **Das Paket bindet an eine bereits separat installierte VLC-/libVLC-Umgebung an.**
+
 ## Externe Systemkomponenten
+
+
+### VLC / libVLC
+- Zweck: optionale eingebettete Vorschau- und Wiedergabe-Engine im Reiter „Treffer prüfen“
+- Lizenz: libVLC und weite Teile der libVLC-Module stehen nach VideoLAN unter LGPL 2.1 oder später
+- Hinweis: **VLC wird nach der vorgesehenen Veröffentlichungsform nicht mit Bleepling ausgeliefert, sondern getrennt installiert und als externe Systemkomponente genutzt.**
 
 ### FFmpeg
 - Zweck: Audio-/Video-Verarbeitung, Rendern, Export
@@ -87,6 +99,7 @@ Zur Klarstellung:
 
 Folgende Komponenten werden von Bleepling nach der derzeit vorgesehenen Veröffentlichungsform **nicht mitgeliefert**, sondern müssen bei Bedarf separat installiert werden:
 
+- VLC / libVLC
 - FFmpeg
 - NVIDIA CUDA
 - NVIDIA cuDNN

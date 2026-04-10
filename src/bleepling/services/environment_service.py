@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -29,6 +30,12 @@ class EnvironmentService:
         Path.home() / ".docker/bin",
     ]
 
+    COMMON_VLC_DIRS = [
+        Path(r"C:/Program Files/VideoLAN/VLC"),
+        Path(r"C:/Program Files (x86)/VideoLAN/VLC"),
+        Path.home() / "AppData/Local/Programs/VideoLAN/VLC",
+    ]
+
     CUDA_DLLS = [
         "cublas64_12.dll",
         "cublasLt64_12.dll",
@@ -43,6 +50,8 @@ class EnvironmentService:
         items: list[DiagnosticItem] = []
         items.append(self._diagnose_python())
         items.append(self._diagnose_ffmpeg())
+        items.append(self._diagnose_vlc_python_module())
+        items.extend(self._diagnose_vlc_runtime())
         items.append(self._diagnose_python_module("faster_whisper", "Python-Modul faster-whisper"))
         items.append(self._diagnose_python_module("ctranslate2", "Python-Modul ctranslate2"))
         items.append(self._diagnose_python_module("openpyxl", "Python-Modul openpyxl (XLSX-Import)"))
@@ -91,23 +100,29 @@ class EnvironmentService:
             if text.lower() not in normalized:
                 path_entries.insert(0, text)
                 normalized.add(text.lower())
-        env["PATH"] = os.pathsep.join(path_entries)
-        return env
+        return {**env, "PATH": os.pathsep.join(path_entries)}
 
     def get_installation_help_text(self) -> str:
         return (
             "Empfehlung für Windows:\n"
-            "1) Python-Pakete wie faster-whisper und ctranslate2 gehören in dieselbe Python-Umgebung, mit der Bleepling gestartet wird.\n"
-            "2) CUDA-/cuDNN-DLLs müssen in einem Ordner liegen, der für den Bleepling-Prozess erreichbar ist, idealerweise in einem dedizierten CUDA-bin-Ordner oder in einem von Bleepling konfigurierten Zusatzpfad.\n"
-            "3) Nach einer Nachinstallation bitte die Prüfung erneut ausführen.\n"
-            "4) Für fremde PCs ist ein konfigurierbarer Zusatzpfad robuster als verteilte Einzel-DLLs in zufälligen Programmen."
+            "1) Python-Pakete wie faster-whisper, ctranslate2 und python-vlc gehören in dieselbe Python-Umgebung, mit der Bleepling gestartet wird.\n"
+            "2) Für den Reiter 'Treffer prüfen' wird zusätzlich eine normale VLC-Desktop-Installation benötigt, weil python-vlc nur die Python-Anbindung liefert, nicht aber libvlc.dll selbst.\n"
+            "3) CUDA-/cuDNN-DLLs müssen in einem Ordner liegen, der für den Bleepling-Prozess erreichbar ist, idealerweise in einem dedizierten CUDA-bin-Ordner oder in einem von Bleepling konfigurierten Zusatzpfad.\n"
+            "4) Nach einer Nachinstallation bitte die Prüfung erneut ausführen.\n"
+            "5) Für fremde PCs ist ein konfigurierbarer Zusatzpfad robuster als verteilte Einzel-DLLs in zufälligen Programmen."
         )
 
     def get_install_command(self) -> str:
         py = shutil.which("python") or sys.executable or "python"
         return (
+            "where winget >nul 2>nul\n"
+            "if %errorlevel%==0 (\n"
+            "  winget install -e --id VideoLAN.VLC\n"
+            ") else (\n"
+            "  echo winget wurde nicht gefunden. Bitte VLC manuell von VideoLAN installieren.\n"
+            ")\n"
             f'"{py}" -m pip install -U pip setuptools wheel\n'
-            f'"{py}" -m pip install -U faster-whisper ctranslate2 openpyxl python-docx pdfplumber pypdf PyPDF2'
+            f'"{py}" -m pip install -U faster-whisper ctranslate2 openpyxl python-docx pdfplumber pypdf PyPDF2 python-vlc'
         )
 
     def get_path_command(self, extra_cuda_paths: Iterable[str] | None = None) -> str:
@@ -126,20 +141,140 @@ class EnvironmentService:
             return DiagnosticItem("FFmpeg", "ok", ffmpeg)
         return DiagnosticItem("FFmpeg", "warn", "FFmpeg wurde im PATH nicht gefunden.")
 
+    def _diagnose_vlc_python_module(self) -> DiagnosticItem:
+        return self._diagnose_python_module("vlc", "Python-Modul python-vlc")
+
+    def _diagnose_vlc_runtime(self) -> list[DiagnosticItem]:
+        items: list[DiagnosticItem] = []
+        vlc_dir = self._find_vlc_dir()
+        if vlc_dir:
+            items.append(DiagnosticItem("VLC-Programmordner", "ok", str(vlc_dir)))
+        else:
+            items.append(DiagnosticItem(
+                "VLC-Programmordner",
+                "warn",
+                "Kein typischer VLC-Installationsordner gefunden. Erwartet wird z. B. C:/Program Files/VideoLAN/VLC.",
+            ))
+
+        vlc_exe = self._find_vlc_exe(vlc_dir)
+        if vlc_exe:
+            items.append(DiagnosticItem("VLC Desktop-App", "ok", str(vlc_exe)))
+        else:
+            items.append(DiagnosticItem(
+                "VLC Desktop-App",
+                "warn",
+                "vlc.exe wurde nicht gefunden. Für die eingebettete Vorschau wird eine normale VLC-Desktop-Installation benötigt.",
+            ))
+
+        libvlc = self._find_libvlc(vlc_dir)
+        if libvlc:
+            items.append(DiagnosticItem("libvlc.dll", "ok", str(libvlc)))
+        else:
+            items.append(DiagnosticItem(
+                "libvlc.dll",
+                "warn",
+                "libvlc.dll wurde nicht gefunden. python-vlc allein reicht nicht aus; zusätzlich wird die VLC-Laufzeitumgebung benötigt.",
+            ))
+
+        plugins_dir = self._find_vlc_plugins_dir(vlc_dir)
+        if plugins_dir:
+            details = str(plugins_dir)
+            cache = plugins_dir / "plugins.dat"
+            if cache.exists():
+                details += f"\nplugins.dat vorhanden: {cache}"
+            else:
+                details += "\nplugins.dat nicht gefunden. Das ist nicht zwingend kritisch, kann aber bei VLC-Problemen auffallen."
+            items.append(DiagnosticItem("VLC-Plugins", "ok", details))
+        else:
+            items.append(DiagnosticItem(
+                "VLC-Plugins",
+                "warn",
+                "Der VLC-Plugins-Ordner wurde nicht gefunden. Ohne Plugins funktionieren Wiedergabe und Dekodierung oft nicht korrekt.",
+            ))
+
+        items.append(self._probe_vlc_runtime(libvlc, plugins_dir))
+        return items
+
+    def _find_vlc_dir(self) -> Path | None:
+        env_hints = [
+            os.environ.get("PYTHON_VLC_MODULE_PATH"),
+            os.environ.get("VLC_PLUGIN_PATH"),
+            os.environ.get("PYTHON_VLC_LIB_PATH"),
+        ]
+        candidates: list[Path] = []
+        for raw in env_hints:
+            if raw:
+                p = Path(raw)
+                if p.suffix.lower() == ".dll":
+                    candidates.append(p.parent)
+                else:
+                    candidates.append(p)
+        candidates.extend(self.COMMON_VLC_DIRS)
+        seen: set[str] = set()
+        for candidate in candidates:
+            key = str(candidate).lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            if not candidate.exists():
+                continue
+            if candidate.is_file():
+                candidate = candidate.parent
+            if (candidate / "vlc.exe").exists() or (candidate / "libvlc.dll").exists():
+                return candidate
+            if (candidate / "plugins").exists() and (candidate.parent / "libvlc.dll").exists():
+                return candidate.parent
+        return None
+
+    def _find_vlc_exe(self, vlc_dir: Path | None) -> Path | None:
+        if vlc_dir:
+            candidate = vlc_dir / "vlc.exe"
+            if candidate.exists():
+                return candidate
+        found = shutil.which("vlc")
+        return Path(found) if found else None
+
+    def _find_libvlc(self, vlc_dir: Path | None) -> Path | None:
+        env_path = os.environ.get("PYTHON_VLC_LIB_PATH")
+        if env_path:
+            p = Path(env_path)
+            if p.exists():
+                return p
+        if vlc_dir:
+            candidate = vlc_dir / "libvlc.dll"
+            if candidate.exists():
+                return candidate
+        return None
+
+    def _find_vlc_plugins_dir(self, vlc_dir: Path | None) -> Path | None:
+        env_path = os.environ.get("PYTHON_VLC_MODULE_PATH") or os.environ.get("VLC_PLUGIN_PATH")
+        if env_path:
+            p = Path(env_path)
+            if p.exists() and p.is_dir():
+                return p
+        if vlc_dir:
+            candidate = vlc_dir / "plugins"
+            if candidate.exists() and candidate.is_dir():
+                return candidate
+        return None
+
     def _diagnose_python_module(self, module_name: str, label: str) -> DiagnosticItem:
         try:
             __import__(module_name)
-            return DiagnosticItem(label, "ok", "verfügbar")
+            spec = importlib.util.find_spec(module_name)
+            origin = getattr(spec, "origin", None) if spec else None
+            return DiagnosticItem(label, "ok", str(origin or "verfügbar"))
         except Exception as exc:
             return DiagnosticItem(label, "warn", f"fehlt oder nicht ladbar: {exc}")
-
 
     def _diagnose_any_python_module(self, module_names: tuple[str, ...], label: str) -> DiagnosticItem:
         errors = []
         for module_name in module_names:
             try:
                 __import__(module_name)
-                return DiagnosticItem(label, "ok", f"verfügbar über {module_name}")
+                spec = importlib.util.find_spec(module_name)
+                origin = getattr(spec, "origin", None) if spec else None
+                return DiagnosticItem(label, "ok", f"verfügbar über {module_name}: {origin or 'ohne Pfadangabe'}")
             except Exception as exc:
                 errors.append(f"{module_name}: {exc}")
         return DiagnosticItem(label, "warn", "fehlt oder nicht ladbar: " + " | ".join(errors))
@@ -160,8 +295,7 @@ class EnvironmentService:
             else:
                 items.append(DiagnosticItem(dll_name, "warn", "im Bleepling-Laufzeitpfad nicht gefunden"))
 
-        gpu_test = self._probe_gpu_python(env)
-        items.append(gpu_test)
+        items.append(self._probe_gpu_python(env))
         return items
 
     def _find_dll_in_path(self, dll_name: str, path_value: str) -> Path | None:
@@ -196,6 +330,42 @@ class EnvironmentService:
         if not details:
             details = "Import von ctranslate2 fehlgeschlagen."
         return DiagnosticItem("GPU-Probe", "warn", details)
+
+    def _probe_vlc_runtime(self, libvlc: Path | None, plugins_dir: Path | None) -> DiagnosticItem:
+        if not libvlc or not plugins_dir:
+            return DiagnosticItem(
+                "VLC-Probe",
+                "warn",
+                "Die VLC-Probe wurde übersprungen, weil libvlc.dll oder der Plugins-Ordner fehlt.",
+            )
+        code = (
+            "import os\n"
+            "import sys\n"
+            f"os.environ['PYTHON_VLC_LIB_PATH'] = r'''{str(libvlc)}'''\n"
+            f"os.environ['PYTHON_VLC_MODULE_PATH'] = r'''{str(plugins_dir)}'''\n"
+            "try:\n"
+            " import vlc\n"
+            " inst = vlc.Instance('--no-audio', '--ignore-config')\n"
+            " player = inst.media_player_new()\n"
+            " print('VLC_OK')\n"
+            " print(type(player).__name__)\n"
+            "except Exception as exc:\n"
+            " print(type(exc).__name__ + ': ' + str(exc))\n"
+            " sys.exit(2)\n"
+        )
+        env = os.environ.copy()
+        env["PYTHON_VLC_LIB_PATH"] = str(libvlc)
+        env["PYTHON_VLC_MODULE_PATH"] = str(plugins_dir)
+        try:
+            result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=20)
+        except Exception as exc:
+            return DiagnosticItem("VLC-Probe", "warn", f"Probe konnte nicht ausgeführt werden: {exc}")
+        if result.returncode == 0:
+            return DiagnosticItem("VLC-Probe", "ok", (result.stdout or "VLC-Initialisierung erfolgreich").strip())
+        details = ((result.stderr or "") + "\n" + (result.stdout or "")).strip()
+        if not details:
+            details = "python-vlc oder libVLC konnte nicht initialisiert werden."
+        return DiagnosticItem("VLC-Probe", "warn", details)
 
     def _diagnose_project_log(self, project: Project) -> DiagnosticItem:
         try:

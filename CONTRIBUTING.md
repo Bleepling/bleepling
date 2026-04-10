@@ -16,6 +16,12 @@ Besonders wichtig sind:
 - transparente Fehlermeldungen
 - zurückhaltende, ehrliche Dokumentation ohne überzogene Versprechen
 
+## Aktueller Workflow-Stand
+
+Der sichtbare Hauptworkflow läuft im Projektstand 1.2.0 vor allem über den Reiter **„Prüfen & Entscheiden“**. Dort sind die frühere Kandidatenprüfung, die Audio-Feinprüfung und die führenden Bleep-Parameter zusammengeführt.
+
+Beiträge an Bedienlogik, Statusführung, Times-Ableitung und Renderübergabe sollten diesen zusammengeführten Workflow respektieren.
+
 ## Arten von Beiträgen
 
 Willkommen sind insbesondere:
@@ -58,7 +64,7 @@ Das gilt besonders für Änderungen an:
 
 - Projektstruktur
 - Bleep-Logik
-- Transkriptions-Workflow
+- Prüf- und Entscheidungsworkflow
 - Exportlogik
 - Einstellungen und Diagnoseroutinen
 - Dateiformaten und Importpfaden

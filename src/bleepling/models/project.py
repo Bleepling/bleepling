@@ -82,6 +82,36 @@ class Project:
     def transcription_json_dir(self) -> Path:
         return self.root_path / "02_transcription" / "json"
 
+    @property
+    def titlecards_output_dir(self) -> Path:
+        return self.root_path / "04_output" / "titlecards"
+
+    @property
+    def titlecards_state_file(self) -> Path:
+        return self.config_dir / "titlecards_state.json"
+
+
+    def read_titlecards_state(self):
+        defaults = {}
+        try:
+            if self.titlecards_state_file.exists():
+                data = json.loads(self.titlecards_state_file.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    defaults.update(data)
+        except Exception:
+            pass
+        return defaults
+
+    def write_titlecards_state(self, data):
+        merged = self.read_titlecards_state()
+        if isinstance(data, dict):
+            merged.update(data)
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        self.titlecards_state_file.write_text(
+            json.dumps(merged, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
     def read_settings(self):
         defaults = {
             "transcription_mode": "auto",

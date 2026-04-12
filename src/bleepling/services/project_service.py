@@ -21,6 +21,7 @@ class ProjectService:
         "03_processing/cleaned",
         "03_processing/name_candidates",
         "04_output/videos",
+        "04_output/titlecards",
         "05_logs",
         "06_presets",
         "99_config",
@@ -37,8 +38,21 @@ class ProjectService:
         "99_config/blocklist.txt": "",
         "99_config/allowlist.txt": "",
         "99_config/app_state.json": "{}\n",
+        "99_config/titlecards_state.json": "{}\n",
         "05_logs/project.log": "",
     }
+
+    def ensure_project_structure(self, root_path: Path) -> None:
+        root_path.mkdir(parents=True, exist_ok=True)
+
+        for rel_dir in self.REQUIRED_DIRS + self.OPTIONAL_COMPAT_DIRS:
+            (root_path / rel_dir).mkdir(parents=True, exist_ok=True)
+
+        for rel_file, content in self.DEFAULT_TEXT_FILES.items():
+            target = root_path / rel_file
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if not target.exists():
+                target.write_text(content, encoding="utf-8")
 
     def create_project(self, base_dir: Path, project_name: str) -> Project:
         safe_name = project_name.strip()
@@ -49,14 +63,7 @@ class ProjectService:
         if root_path.exists() and any(root_path.iterdir()):
             raise FileExistsError("Der Zielordner existiert bereits und ist nicht leer.")
 
-        root_path.mkdir(parents=True, exist_ok=True)
-        for rel_dir in self.REQUIRED_DIRS + self.OPTIONAL_COMPAT_DIRS:
-            (root_path / rel_dir).mkdir(parents=True, exist_ok=True)
-
-        for rel_file, content in self.DEFAULT_TEXT_FILES.items():
-            target = root_path / rel_file
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content, encoding="utf-8")
+        self.ensure_project_structure(root_path)
 
         project = Project(name=safe_name, root_path=root_path)
         self.save_project(project)
@@ -77,12 +84,14 @@ class ProjectService:
         )
 
     def load_project(self, project_root: Path) -> Project:
+        self.ensure_project_structure(project_root)
+
         project_file = project_root / "99_config" / "project.json"
         if not project_file.exists():
             raise FileNotFoundError("project.json wurde nicht gefunden.")
 
         payload = json.loads(project_file.read_text(encoding="utf-8"))
-        return Project(
+        project = Project(
             name=payload["name"],
             root_path=Path(payload["root_path"]),
             language=payload.get("language", "de"),
@@ -91,7 +100,14 @@ class ProjectService:
             metadata=payload.get("metadata", {}),
         )
 
+        self.ensure_project_structure(project.root_path)
+        return project
+
     def validate_project(self, project_root: Path) -> list[str]:
+        # Fehlende Standardordner und neue Erweiterungsordner werden automatisch ergänzt,
+        # damit ältere Projekte weiterhin ohne manuelle Nacharbeit geladen werden können.
+        self.ensure_project_structure(project_root)
+
         missing: list[str] = []
         for rel_dir in self.REQUIRED_DIRS:
             if not (project_root / rel_dir).exists():

@@ -4,6 +4,34 @@ Alle nennenswerten Änderungen an **Bleepling** sollen in dieser Datei dokumenti
 
 Die Struktur orientiert sich an einer einfachen, für Open-Source-Projekte gut lesbaren Versionshistorie.
 
+## [1.2.1] - 2026-04-12
+
+### Hinzugefügt
+- neuer Reiter **„Titelkarten“** zur Erstellung von PNG-Titelkarten im Format **1920 × 1080**
+- projektbezogener Export von Titelkarten nach `04_output/titlecards`
+- projektbezogene Speicherung des Titelkarten-Zustands in `99_config/titlecards_state.json`
+- größere Live-Vorschau mit neutraler Standardansicht im Titelkarten-Reiter
+- zusätzliche Regler für **Y-Position der Dachzeile**, **Y-Position der Titelbox**, **Breite der Titelbox** und **Höhe der Titelbox**
+
+### Geändert
+- Systemschriftarten werden im Reiter **„Titelkarten“** dynamisch aus dem jeweiligen Windows-System geladen
+- gängige Standardschriftarten werden in der Auswahlliste bevorzugt nach oben sortiert
+- leere Dachzeilen- und Titelfelder werden in der Vorschau nicht mehr künstlich angezeigt
+- neutrale Startansicht im Titelkarten-Reiter ohne veranstaltungsspezifische Demo-Inhalte
+- bestehende Projekte werden beim Laden um die neue Titelkarten-Struktur ergänzt, statt wegen fehlender Unterordner abgewiesen zu werden
+- Benutzerdokumentation, README und Release-Unterlagen auf den Stand **1.2.1** fortgeschrieben
+
+### Behoben
+- Import- und Ladeprobleme älterer Projekte wegen fehlendem Ordner `04_output/titlecards`
+- unpassende oder irreführende Standardinhalte in der neutralen Vorschau des Titelkarten-Reiters
+- Verlust der Layout-Steuerung für vertikale Position und Größe der Titelbox in einer Zwischenfassung
+- unnötig kleine Vorschau und störende Platzhalterreste in frühen Fassungen des Titelkarten-Reiters
+
+### Hinweise
+- Für Schriftarten werden **keine Font-Dateien mitgeliefert**
+- Die Nutzungs- und Lizenzprüfung verwendeter Systemschriftarten liegt beim jeweiligen Anwender
+- Titelkarten sind eine Ergänzung des bestehenden Workflows und können insbesondere in Verbindung mit dem Reiter **„Gezielte Nachbearbeitung“** für Vor- und Nachspannbilder verwendet werden
+
 ## [1.2.0] - 2026-04-11
 
 ### Hinzugefügt

@@ -4,6 +4,8 @@ Bleepling ist eine lokal laufende Open-Source-Anwendung zur Anonymisierung von A
 
 Die Anwendung unterstützt einen nachvollziehbaren Prüf-Workflow: Aus einem Video oder einer Audioquelle werden Transkriptionsdaten erzeugt, daraus Kandidaten für mögliche Namensnennungen abgeleitet, diese werden menschlich geprüft und anschließend in Form einer Times-Datei für den finalen Bleep-Export verwendet.
 
+Seit Version **1.2.1** enthält Bleepling zusätzlich den Reiter **„Titelkarten“**. Damit können innerhalb des Projekts PNG-Titelkarten im Format **1920 × 1080** erstellt, gespeichert und für Vor- oder Nachspannzwecke weiterverwendet werden.
+
 ## Hauptfunktionen
 
 - lokale Verarbeitung von Audio- und Videodateien
@@ -15,13 +17,14 @@ Die Anwendung unterstützt einen nachvollziehbaren Prüf-Workflow: Aus einem Vid
 - Erzeugung von Times-Dateien mit Intervallen für gezielte Bleeps
 - finaler Export gebleepter Video- oder Audiodateien über FFmpeg
 - gezielte Nachbearbeitung bereits erzeugter Medien
+- Erstellung von PNG-Titelkarten über den Reiter **„Titelkarten“**
 - Einstellungs- und Log-Bereich für Prüfung, Installation und Fehlersuche
 
 ## Ziel des Projekts
 
 Bleepling soll helfen, datenschutzrechtlich problematische Namensnennungen in Medien vor einer Veröffentlichung, Weitergabe oder Archivierung kontrolliert zu anonymisieren.
 
-Die Anwendung ist nicht als kreative Videoschnittsoftware gedacht, sondern als fachlich orientiertes Werkzeug für einen strukturierten Datenschutz-Workflow.
+Die Anwendung ist nicht als kreative Videoschnittsoftware gedacht, sondern als fachlich orientiertes Werkzeug für einen strukturierten Datenschutz-Workflow. Der neue Titelkarten-Reiter erweitert diesen Workflow um eine einfache, lokal arbeitende Möglichkeit zur Erstellung von Vor- und Nachspannkarten, ohne dafür eine separate Grafik- oder Videosoftware zu benötigen.
 
 ## Wichtiger Hinweis
 
@@ -59,16 +62,33 @@ Diese Komponenten sind **nicht Bestandteil dieses Projekts** und müssen bei Bed
 
 ## Reiter im Überblick
 
-Der Arbeitsstand 1.2.0 verwendet insbesondere diese sichtbaren Reiter:
+Der Arbeitsstand **1.2.1** verwendet insbesondere diese sichtbaren Reiter:
 
 - **Projekt** – Projekt anlegen, laden und verwalten
 - **Medien** – Video- und WAV-Dateien ins Projekt übernehmen
 - **Prüfen & Entscheiden** – Vorbereitung, Namenslisten, Kandidatenprüfung, Audio-Feinprüfung, Bleep-Parameter und Times-Ableitung
 - **Video & Audio / FFmpeg** – finaler Export gebleepter Video- oder Audiodateien
 - **Gezielte Nachbearbeitung** – zusätzliche Einzel-Bleeps sowie Vor- und Nachspannbilder
+- **Titelkarten** – Erstellung, Vorschau und Export von PNG-Titelkarten
 - **Einstellungen / Logs** – technische Prüfung, Diagnose und Unterstützung bei Installationsschritten
 
 Die früheren Reiter **„Bleeping“** und **„Treffer prüfen“** sind im sichtbaren Workflow durch den kombinierten Reiter **„Prüfen & Entscheiden“** ersetzt worden.
+
+## Titelkarten
+
+Der Reiter **„Titelkarten“** ist für die Erstellung statischer PNG-Karten im Format **1920 × 1080** gedacht. Diese Karten können insbesondere als Vor- oder Nachspannbilder im weiteren Workflow verwendet werden.
+
+Unterstützt werden unter anderem:
+
+- Dachzeile und Titeltext
+- farbige Titelbox mit einstellbarer Größe
+- vertikale Positionierung von Dachzeile und Titelbox
+- Logos links unten und rechts unten
+- Hintergrundbild als Grundlayout
+- Export direkt in den Projektordner `04_output/titlecards`
+- zusätzlicher PNG-Export an einen frei wählbaren Ort
+
+Für Schriftarten werden **die lokal auf dem jeweiligen Windows-Rechner verfügbaren Systemschriftarten** genutzt. Bleepling liefert **keine eigenen Font-Dateien** mit. Die Prüfung der Nutzungsrechte verwendeter Schriftarten liegt daher beim jeweiligen Anwender.
 
 ## Einstellungen / Logs
 
@@ -156,8 +176,9 @@ python -m bleepling.app
 7. Kandidaten auswerten, Treffer im Audio prüfen und erforderlichenfalls feinjustieren
 8. Bleep-Parameter im Reiter **„Prüfen & Entscheiden“** festlegen und anwenden
 9. Times-Datei mit Intervallen ableiten
-10. gebleepte Audio- oder Videodatei über **„Video & Audio / FFmpeg“** exportieren
-11. Ergebnis manuell kontrollieren
+10. bei Bedarf im Reiter **„Titelkarten“** eine Vor- oder Nachspannkarte erzeugen
+11. gebleepte Audio- oder Videodatei über **„Video & Audio / FFmpeg“** exportieren
+12. Ergebnis manuell kontrollieren
 
 ## Unterstützte Eingaben
 
@@ -178,6 +199,23 @@ python -m bleepling.app
 - XLSX
 - DOCX
 - PDF
+
+### Titelkarten-bezogene Eingaben
+- PNG
+- JPG / JPEG
+- BMP
+- WEBP
+
+## Projektstruktur
+
+Im Projektstand 1.2.1 werden unter anderem diese projektbezogenen Pfade verwendet:
+
+04_output/videos
+04_output/titlecards
+99_config/app_state.json
+99_config/titlecards_state.json
+
+Fehlende neue Projektordner werden beim Laden bestehender Projekte nach Möglichkeit automatisch ergänzt, damit ältere Projekte weiterhin verwendet werden können.
 
 ## Projektstatus
 

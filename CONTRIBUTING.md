@@ -18,9 +18,9 @@ Besonders wichtig sind:
 
 ## Aktueller Workflow-Stand
 
-Der sichtbare Hauptworkflow läuft im Projektstand 1.2.0 vor allem über den Reiter **„Prüfen & Entscheiden“**. Dort sind die frühere Kandidatenprüfung, die Audio-Feinprüfung und die führenden Bleep-Parameter zusammengeführt.
+Der sichtbare Hauptworkflow läuft im Projektstand **1.2.1** vor allem über den Reiter **„Prüfen & Entscheiden“** für den eigentlichen Anonymisierungsprozess sowie ergänzend über den Reiter **„Titelkarten“** für statische PNG-Karten, die im weiteren Workflow insbesondere als Vor- oder Nachspannbilder verwendet werden können.
 
-Beiträge an Bedienlogik, Statusführung, Times-Ableitung und Renderübergabe sollten diesen zusammengeführten Workflow respektieren.
+Beiträge an Bedienlogik, Statusführung, Times-Ableitung, Renderübergabe und Titelkarten-Export sollten diesen Workflow respektieren.
 
 ## Arten von Beiträgen
 
@@ -66,6 +66,7 @@ Das gilt besonders für Änderungen an:
 - Bleep-Logik
 - Prüf- und Entscheidungsworkflow
 - Exportlogik
+- Titelkarten-Logik und PNG-Erzeugung
 - Einstellungen und Diagnoseroutinen
 - Dateiformaten und Importpfaden
 
@@ -89,6 +90,7 @@ Das betrifft insbesondere:
 - README
 - Benutzerdokumentation
 - Installationshinweise
+- Changelog
 - Third-Party-Hinweise
 - Einstellungen / Logs
 - neue oder geänderte Arbeitsabläufe
@@ -99,13 +101,18 @@ Mit einem Beitrag erklärst du dich damit einverstanden, dass dein Beitrag unter
 
 Bitte reiche nur Beiträge ein, an denen du die erforderlichen Rechte hast.
 
-Keine fremden Codebestandteile, Grafiken, Texte oder sonstigen Inhalte einreichen, wenn deren Lizenzlage unklar oder mit dem Projekt unvereinbar ist.
+Keine fremden Codebestandteile, Grafiken, Texte, Schriftdateien oder sonstigen Inhalte einreichen, wenn deren Lizenzlage unklar oder mit dem Projekt unvereinbar ist.
 
 ## Externe Komponenten
 
 Bleepling nutzt oder prüft teilweise externe Komponenten wie FFmpeg oder optionale GPU-bezogene Laufzeitumgebungen.
 
 Solche Komponenten sind nicht automatisch Teil des Repositorys. Beiträge sollten diese Trennung respektieren und keine Drittsoftware ungeprüft in das Projekt einführen.
+
+Für den Reiter **„Titelkarten“** gilt zusätzlich:
+
+- es sollen grundsätzlich **keine Font-Dateien ins Repository aufgenommen** werden, wenn die Funktion mit lokal vorhandenen Systemschriftarten arbeitet
+- bei Änderungen an der Titelkarten-Funktion ist zu beachten, dass projektbezogene Laufzeitdateien wie `99_config/titlecards_state.json` und exportierte PNG-Dateien nicht in das Repository gehören
 
 ## Qualität vor Tempo
 

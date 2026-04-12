@@ -11,6 +11,7 @@ from bleepling.tabs.ffmpeg_tab import FFmpegTab
 from bleepling.tabs.targeted_edit_tab import TargetedEditTab
 from bleepling.tabs.hit_review_tab import HitReviewTab
 from bleepling.tabs.settings_tab import SettingsTab
+from bleepling.tabs.titlecards_tab import TitleCardsTab
 from bleepling.tabs.combined_review_tab import CombinedReviewTab
 from PIL import Image, ImageTk
 
@@ -136,6 +137,7 @@ class BleeplingApp(tk.Tk):
         self.targeted_edit_tab = TargetedEditTab(self.notebook, self)
         self.hit_review_tab = HitReviewTab(self.notebook, self)
         self.combined_review_tab = CombinedReviewTab(self.notebook, self)
+        self.titlecards_tab = TitleCardsTab(self.notebook, self)
         self.settings_tab = SettingsTab(self.notebook, self)
 
         for txt, tab in [
@@ -144,6 +146,7 @@ class BleeplingApp(tk.Tk):
             ("Prüfen & Entscheiden", self.combined_review_tab),
             ("Video & Audio / FFmpeg", self.ffmpeg_tab),
             ("Gezielte Nachbearbeitung", self.targeted_edit_tab),
+            ("Titelkarten", self.titlecards_tab),
             ("Einstellungen / Logs", self.settings_tab),
         ]:
             self.notebook.add(tab, text=txt)
@@ -162,6 +165,7 @@ class BleeplingApp(tk.Tk):
             self.targeted_edit_tab,
             self.hit_review_tab,
             self.combined_review_tab,
+            self.titlecards_tab,
             self.settings_tab,
         ]:
             try:

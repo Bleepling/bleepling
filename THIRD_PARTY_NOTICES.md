@@ -67,14 +67,13 @@ Nach aktuellem Projektstand werden insbesondere folgende Python-Pakete verwendet
 
 ## Externe Systemkomponenten
 
-
 ### VLC / libVLC
-- Zweck: optionale eingebettete Vorschau- und Wiedergabe-Engine im Reiter „Treffer prüfen“
+- Zweck: optionale eingebettete Vorschau- und Wiedergabe-Engine insbesondere im Reiter **„Schnitt & Kapitel“**
 - Lizenz: libVLC und weite Teile der libVLC-Module stehen nach VideoLAN unter LGPL 2.1 oder später
 - Hinweis: **VLC wird nach der vorgesehenen Veröffentlichungsform nicht mit Bleepling ausgeliefert, sondern getrennt installiert und als externe Systemkomponente genutzt.**
 
 ### FFmpeg
-- Zweck: Audio-/Video-Verarbeitung, Rendern, Export
+- Zweck: Audio-/Video-Verarbeitung, Rendern, Export sowie Bildung von Arbeitsvideos und Clips
 - Lizenz: je nach Build und Konfiguration, typischerweise LGPL 2.1+ oder GPL
 - Hinweis: **FFmpeg ist nicht Bestandteil dieses Projekts und wird nicht mit Bleepling ausgeliefert.**
 

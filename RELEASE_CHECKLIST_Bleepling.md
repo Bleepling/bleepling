@@ -19,7 +19,8 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] keine lokalen Hilfsdateien oder privaten Notizen im Release
 - [ ] Verzeichnisstruktur für `src`, Dokumentation und Hilfsdateien ist konsistent
 - [ ] Startdateien und Startwege sind dokumentiert
-- [ ] neuer Reiter `Titelkarten` ist in Code, Doku und Release-Unterlagen konsistent berücksichtigt
+- [ ] neuer Reiter `Schnitt & Kapitel` ist in Code, Doku und Release-Unterlagen konsistent berücksichtigt
+- [ ] Reiter `Titelkarten` ist weiterhin in Code, Doku und Release-Unterlagen konsistent berücksichtigt
 
 ## 3. Aufräumen vor Veröffentlichung
 
@@ -30,7 +31,7 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] keine versehentlich mitgelieferten temporären Dateien
 - [ ] keine lokalen Log-Dateien im öffentlichen Paket
 - [ ] keine unbeabsichtigt mitgelieferten Medien-, Test- oder Beispieldateien mit sensiblen Inhalten
-- [ ] keine zur Laufzeit erzeugten Projektdateien wie `99_config/titlecards_state.json` oder Inhalte aus `04_output/titlecards` im Release
+- [ ] keine zur Laufzeit erzeugten Projektdateien wie `99_config/titlecards_state.json`, Arbeitsvideos oder Inhalte aus `04_output/titlecards` und `01_input/video` im Release
 
 ## 4. Abhängigkeiten und externe Komponenten
 
@@ -38,6 +39,7 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] nur tatsächlich benötigte Python-Pakete sind enthalten
 - [ ] FFmpeg ist **nicht** im Paket enthalten
 - [ ] README weist klar darauf hin, dass FFmpeg separat installiert werden muss
+- [ ] optionale VLC-/libVLC-Komponenten sind **nicht** im Paket enthalten
 - [ ] optionale CUDA-/cuDNN-Komponenten sind **nicht** im Paket enthalten
 - [ ] Dokumentation trennt sauber zwischen mitgelieferter Software und externen Systemkomponenten
 - [ ] es werden keine Font-Dateien mitgeliefert, wenn nur lokale Systemschriftarten verwendet werden
@@ -51,6 +53,7 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] Formulierungen im README sind sachlich und nicht irreführend
 - [ ] Hinweis auf notwendige menschliche Endkontrolle ist enthalten
 - [ ] Hinweis zur eigenverantwortlichen Prüfung verwendeter Systemschriftarten ist dort enthalten, wo der Titelkarten-Reiter beschrieben wird
+- [ ] Hinweis auf die optionale VLC-/libVLC-Umgebung für `Schnitt & Kapitel` ist dort enthalten, wo die Funktion beschrieben wird
 
 ## 6. Technische Prüfung
 
@@ -58,8 +61,12 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] Start über `start_bleepling.bat` funktioniert
 - [ ] alternativer Python-Startweg funktioniert
 - [ ] Reiter `Einstellungen / Logs` arbeitet nachvollziehbar
+- [ ] Reiter `Schnitt & Kapitel` startet und arbeitet mit dem vorgesehenen Grundworkflow nachvollziehbar
+- [ ] Arbeitsvideo-Erzeugung funktioniert
+- [ ] vorhandene Arbeitsvideos lassen sich auswählen oder wiedererkennen
+- [ ] Clip-Erzeugung aus dem Schnittfenster funktioniert
 - [ ] Reiter `Titelkarten` startet und speichert ohne Fehlermeldung
-- [ ] bestehende ältere Projekte lassen sich trotz neuer Titelkarten-Struktur laden
+- [ ] bestehende ältere Projekte lassen sich trotz neuer Titelkarten- und Schnitt-Struktur laden
 - [ ] Export nach `04_output/titlecards` funktioniert
 - [ ] freier PNG-Export funktioniert
 - [ ] Titelkarten mit leerem Startzustand, mit Hintergrundbild und mit Logos testweise durchlaufen
@@ -73,7 +80,8 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] typische Arbeitsabläufe sind nachvollziehbar beschrieben
 - [ ] Einschränkungen und Grenzen des Projekts sind dokumentiert
 - [ ] Third-Party-Hinweise sind mit dem Projektstand konsistent
-- [ ] neue Funktion `Titelkarten` ist in README, Changelog und Benutzerdokumentation konsistent beschrieben
+- [ ] neue Funktion `Schnitt & Kapitel` ist in README, Changelog und Benutzerdokumentation konsistent beschrieben
+- [ ] Funktion `Titelkarten` ist weiterhin in README, Changelog und Benutzerdokumentation konsistent beschrieben
 
 ## 8. Vor dem finalen ZIP
 
@@ -91,7 +99,8 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] erste Release-Notiz vorbereitet
 - [ ] Entscheidung über GitHub, Codeberg oder beides getroffen
 - [ ] gegebenenfalls Topics/Schlagwörter vorbereitet
-- [ ] Release-Notiz für 1.2.1 erwähnt den neuen Reiter `Titelkarten` und die automatische Ergänzung älterer Projekte
+- [ ] Release-Notiz für 1.3.0 erwähnt den neuen Reiter `Schnitt & Kapitel`
+- [ ] Release-Notiz erwähnt weiterhin den Reiter `Titelkarten`, soweit dies für die Gesamteinordnung des aktuellen Funktionsstands sinnvoll ist
 
 ## Notiz
 

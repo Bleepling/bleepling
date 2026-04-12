@@ -18,9 +18,9 @@ Besonders wichtig sind:
 
 ## Aktueller Workflow-Stand
 
-Der sichtbare Hauptworkflow läuft im Projektstand **1.2.1** vor allem über den Reiter **„Prüfen & Entscheiden“** für den eigentlichen Anonymisierungsprozess sowie ergänzend über den Reiter **„Titelkarten“** für statische PNG-Karten, die im weiteren Workflow insbesondere als Vor- oder Nachspannbilder verwendet werden können.
+Der sichtbare Hauptworkflow läuft im Projektstand **1.3.0** vor allem über den Reiter **„Prüfen & Entscheiden“** für den eigentlichen Anonymisierungsprozess. Ergänzend stehen jetzt der Reiter **„Schnitt & Kapitel“** für die vorbereitende manuelle Clip-Erzeugung aus Quellvideos sowie der Reiter **„Titelkarten“** für statische PNG-Karten zur Verfügung.
 
-Beiträge an Bedienlogik, Statusführung, Times-Ableitung, Renderübergabe und Titelkarten-Export sollten diesen Workflow respektieren.
+Beiträge an Bedienlogik, Statusführung, Times-Ableitung, Renderübergabe, Schnittfenster, Arbeitsvideo-Erzeugung und Titelkarten-Export sollten diesen Workflow respektieren.
 
 ## Arten von Beiträgen
 
@@ -51,7 +51,7 @@ Ein guter Bug-Report sollte möglichst enthalten:
 - Schritte zur Reproduktion
 - verwendetes Betriebssystem
 - Python-Version
-- installierte oder fehlende Komponenten wie FFmpeg oder GPU-Unterstützung
+- installierte oder fehlende Komponenten wie FFmpeg, VLC/libVLC oder GPU-Unterstützung
 - relevante Fehlermeldungen aus Logs oder Oberfläche
 
 Wenn personenbezogene oder vertrauliche Inhalte betroffen sind, bitte keine sensiblen Originaldateien hochladen.
@@ -65,6 +65,8 @@ Das gilt besonders für Änderungen an:
 - Projektstruktur
 - Bleep-Logik
 - Prüf- und Entscheidungsworkflow
+- Schnitt- und Kapitelworkflow
+- Arbeitsvideo- und Clip-Erzeugung
 - Exportlogik
 - Titelkarten-Logik und PNG-Erzeugung
 - Einstellungen und Diagnoseroutinen
@@ -105,7 +107,7 @@ Keine fremden Codebestandteile, Grafiken, Texte, Schriftdateien oder sonstigen I
 
 ## Externe Komponenten
 
-Bleepling nutzt oder prüft teilweise externe Komponenten wie FFmpeg oder optionale GPU-bezogene Laufzeitumgebungen.
+Bleepling nutzt oder prüft teilweise externe Komponenten wie FFmpeg, python-vlc, VLC/libVLC oder optionale GPU-bezogene Laufzeitumgebungen.
 
 Solche Komponenten sind nicht automatisch Teil des Repositorys. Beiträge sollten diese Trennung respektieren und keine Drittsoftware ungeprüft in das Projekt einführen.
 
@@ -113,6 +115,12 @@ Für den Reiter **„Titelkarten“** gilt zusätzlich:
 
 - es sollen grundsätzlich **keine Font-Dateien ins Repository aufgenommen** werden, wenn die Funktion mit lokal vorhandenen Systemschriftarten arbeitet
 - bei Änderungen an der Titelkarten-Funktion ist zu beachten, dass projektbezogene Laufzeitdateien wie `99_config/titlecards_state.json` und exportierte PNG-Dateien nicht in das Repository gehören
+
+Für den Reiter **„Schnitt & Kapitel“** gilt zusätzlich:
+
+- projektinterne Arbeitsvideos und erzeugte Clips sind Laufzeitdateien und gehören nicht ins Repository
+- eingebettete Vorschau setzt eine lokal vorhandene VLC-/libVLC-Umgebung voraus; diese wird nicht mit dem Repository ausgeliefert
+- Änderungen an Vorschau- und Playerlogik sollten besonders vorsichtig und möglichst isoliert erfolgen
 
 ## Qualität vor Tempo
 

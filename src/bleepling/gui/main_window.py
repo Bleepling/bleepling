@@ -6,6 +6,7 @@ from tkinter import ttk
 
 from bleepling.tabs.project_tab import ProjectTab
 from bleepling.tabs.media_tab import MediaTab
+from bleepling.tabs.cut_tab import CutTab
 from bleepling.tabs.bleeping_tab import BleepingTab
 from bleepling.tabs.ffmpeg_tab import FFmpegTab
 from bleepling.tabs.targeted_edit_tab import TargetedEditTab
@@ -132,6 +133,7 @@ class BleeplingApp(tk.Tk):
 
         self.project_tab = ProjectTab(self.notebook, self)
         self.media_tab = MediaTab(self.notebook, self)
+        self.cut_tab = CutTab(self.notebook, self)
         self.bleeping_tab = BleepingTab(self.notebook, self)
         self.ffmpeg_tab = FFmpegTab(self.notebook, self)
         self.targeted_edit_tab = TargetedEditTab(self.notebook, self)
@@ -143,6 +145,7 @@ class BleeplingApp(tk.Tk):
         for txt, tab in [
             ("Projekt", self.project_tab),
             ("Medien", self.media_tab),
+            ("Schnitt & Kapitel", self.cut_tab),
             ("Prüfen & Entscheiden", self.combined_review_tab),
             ("Video & Audio / FFmpeg", self.ffmpeg_tab),
             ("Gezielte Nachbearbeitung", self.targeted_edit_tab),
@@ -160,6 +163,7 @@ class BleeplingApp(tk.Tk):
         for tab in [
             self.project_tab,
             self.media_tab,
+            self.cut_tab,
             self.bleeping_tab,
             self.ffmpeg_tab,
             self.targeted_edit_tab,

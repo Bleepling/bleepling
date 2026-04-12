@@ -4,6 +4,36 @@ Alle nennenswerten Änderungen an **Bleepling** sollen in dieser Datei dokumenti
 
 Die Struktur orientiert sich an einer einfachen, für Open-Source-Projekte gut lesbaren Versionshistorie.
 
+## [1.3.0] - 2026-04-12
+
+### Hinzugefügt
+- neuer Reiter **„Schnitt & Kapitel“** als zusätzlicher Vorbau vor den bisherigen Prüfworkflow
+- Bildung eines projektbezogenen **Arbeitsvideos** aus ausgewählten Quellvideos
+- internes **Schnittfenster** mit eingebetteter Vorschau, Sprungbuttons und Markensetzung
+- Möglichkeit, Start- und Endmarken manuell zu setzen und daraus einzelne Clips anzulegen
+- Erzeugung ausgewählter oder aller Clips als neue Projektmedien
+- Wiederverwendung vorhandener Arbeitsvideos einschließlich Auswahl- und Erkennungslogik
+- Hilfe-Buttons im Hauptreiter **„Schnitt & Kapitel“** und im zugehörigen Schnittfenster
+- projektbezogene Clip-Logik mit Dateinamensvorschlägen und Validierung
+
+### Geändert
+- sichtbarer Hauptworkflow erweitert um den Reiter **„Schnitt & Kapitel“**
+- Dokumentation, README und Release-Unterlagen auf den Stand **1.3.0** fortgeschrieben
+- Reiter **„Einstellungen / Logs“** und Third-Party-Hinweise berücksichtigen die optional genutzte VLC-/libVLC-Umgebung nun auch im Zusammenhang mit dem neuen Schnitt-Reiter
+- Benutzerdokumentation um den neuen vorbereitenden Schnitt-Workflow ergänzt
+
+### Behoben
+- fehlende oder inkonsistente Fortschreibung von Clip-Dateinamen bei mehrfacher Clip-Erzeugung
+- fehlende Plausibilitätsprüfung, wenn Endmarke vor oder auf Startmarke liegt
+- fehlerhafte Weiterverwendung bereits vorhandener Arbeitsvideos
+- UI-Unklarheiten bei Clip-Erzeugung und fehlende Rückmeldung bei längeren Clip-Renderläufen
+- Ton, der nach dem Schließen des Schnittfensters im Hintergrund weiterlief
+
+### Hinweise
+- Der Reiter **„Schnitt & Kapitel“** ergänzt den bisherigen Direktworkflow, ersetzt ihn aber nicht. Wer mit bereits vorbereiteten Einzelvideos arbeitet, kann weiterhin direkt mit **„Prüfen & Entscheiden“** beginnen.
+- Die eingebettete Vorschau im Schnittfenster nutzt eine lokal vorhandene **VLC-/libVLC-Umgebung**, soweit diese installiert ist.
+- Eine menschliche Endkontrolle anonymisierter Medien bleibt weiterhin erforderlich.
+
 ## [1.2.1] - 2026-04-12
 
 ### Hinzugefügt

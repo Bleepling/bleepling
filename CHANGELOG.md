@@ -4,6 +4,20 @@ Alle nennenswerten Änderungen an **Bleepling** sollen in dieser Datei dokumenti
 
 Die Struktur orientiert sich an einer einfachen, für Open-Source-Projekte gut lesbaren Versionshistorie.
 
+## [1.4.1] - 2026-04-16
+
+### Geändert
+- Teilnehmerlisten im Reiter **„Prüfen & Entscheiden“** lassen sich jetzt flexibler als **Nachnamen**, **Vornamen** oder in kombinierter Form übernehmen
+- der kombinierte Prüf-Reiter zeigt für **Blocklist** und **Allowlist** jetzt kleine, laufend aktualisierte Summenzähler direkt in der Oberfläche
+- im Bereich der Teilnehmerlisten steht zusätzlich ein expliziter Button **„Akt.“** zur Verfügung, um die zuletzt importierte Liste mit den aktuell gesetzten Namensoptionen gezielt neu aufzubauen
+- README, Release-Unterlagen und Benutzerdokumentation auf den Stand **1.4.1** fortgeschrieben
+
+### Behoben
+- PDF-Teilnehmerverzeichnisse mit tabellarischer Struktur werden robuster gelesen, insbesondere wenn Spalten in der Textausgabe verrutschen
+- kurze echte Nachnamen aus Teilnehmerverzeichnissen werden im PDF-Import nicht mehr unnötig verworfen
+- bereits importierte Teilnehmerlisten lassen sich im sichtbaren Reiter **„Prüfen & Entscheiden“** jetzt zuverlässig neu anwenden, ohne manuelle Blocklist-Einträge zu verlieren
+- die sichtbare Oberfläche des kombinierten Prüf-Reiters und die interne Teilnehmerlisten-Logik des zugrunde liegenden Bleeping-Reiters wurden wieder auf denselben funktionalen Stand gebracht
+
 ## [1.4.0] - 2026-04-15
 
 ### Hinzugefügt

@@ -249,11 +249,17 @@ class CutTab(ttk.Frame):
             "Hilfe – Arbeitsvideo und Zielordner",
             "Hier erzeugst oder übernimmst du das Arbeitsvideo als Schnittgrundlage. "
             "Außerdem siehst du sofort, wo das Arbeitsvideo und die späteren Clips gespeichert werden.\n\n"
+            "Die Buttons in diesem Bereich werden vor allem dann wichtig, wenn du mit mehreren Quellvideos, "
+            "unterschiedlichen Reihenfolgen oder verschiedenen Arbeitsständen arbeitest. Dann kann es im Projekt "
+            "mehrere passende Arbeitsvideos geben.\n\n"
             "Üblicher Ablauf:\n"
             "1. Quellvideos festlegen\n"
-            "2. Arbeitsvideo bilden oder vorhandenes Arbeitsvideo wählen\n"
-            "3. Danach das Schnittfenster öffnen\n\n"
-            "Wenn bereits ein passendes Arbeitsvideo vorhanden ist, kann es wiederverwendet werden."
+            "2. Arbeitsvideo aus Auswahl bilden\n"
+            "3. Nur bei Bedarf ein vorhandenes Arbeitsvideo wählen oder das Arbeitsvideo erneut bilden\n"
+            "4. Danach das Schnittfenster öffnen\n\n"
+            "Wenn bereits ein passendes Arbeitsvideo vorhanden ist, kann es wiederverwendet werden. "
+            "Das ist besonders hilfreich, wenn du später im selben Projekt eine andere Videozusammenstellung "
+            "oder einen früheren Arbeitsstand weiterbearbeiten möchtest."
         )
 
     def show_help_marks_main(self):

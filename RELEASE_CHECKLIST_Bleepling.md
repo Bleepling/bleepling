@@ -104,8 +104,8 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] erste Release-Notiz vorbereitet
 - [ ] Entscheidung über GitHub, Codeberg oder beides getroffen
 - [ ] gegebenenfalls Topics/Schlagwörter vorbereitet
-- [ ] Release-Notiz für 1.4.0 erwähnt die erweiterten Funktionen im Reiter `Titelkarten`
-- [ ] Release-Notiz für 1.4.0 erwähnt die geglättete Oberfläche des Reiters `Einstellungen / Logs`
+- [ ] Release-Notiz für 1.4.1 erwähnt die flexiblere Teilnehmerlisten-Übernahme im Reiter `Prüfen & Entscheiden`
+- [ ] Release-Notiz für 1.4.1 erwähnt die robustere PDF-Verarbeitung von Teilnehmerverzeichnissen
 - [ ] Release-Notiz erwähnt weiterhin den Reiter `Schnitt & Kapitel`, soweit dies für die Gesamteinordnung des aktuellen Funktionsstands sinnvoll ist
 
 ## Notiz

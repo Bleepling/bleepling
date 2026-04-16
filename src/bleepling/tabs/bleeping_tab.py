@@ -113,8 +113,131 @@ def _normalize_header_token(value: str) -> str:
     value = value.replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")
     return re.sub(r"\s+", " ", value)
 
+def _pdfplumber_tables_to_text(path: Path) -> str:
+    texts = []
+    with pdfplumber.open(str(path)) as pdf:
+        for page in pdf.pages:
+            try:
+                txt = page.extract_text() or ""
+            except Exception:
+                txt = ""
+            if txt.strip():
+                texts.append(txt)
+    return "\n".join(texts)
+
+def _extract_names_from_pdf_tables(path: Path, include_firstnames: bool = False) -> list[str]:
+    if pdfplumber is None:
+        return []
+
+    surnames: list[str] = []
+    firstnames: list[str] = []
+
+    def _clean_cell(value) -> str:
+        if value is None:
+            return ""
+        return " ".join(str(value).replace("\n", " ").split()).strip()
+
+    def _find_header_positions(row: list[str]) -> tuple[int | None, int | None]:
+        first_idx = None
+        last_idx = None
+        for idx, cell in enumerate(row):
+            norm = _normalize_header_token(cell)
+            if "vorname" in norm and first_idx is None:
+                first_idx = idx
+            if "nachname" in norm and last_idx is None:
+                last_idx = idx
+        return first_idx, last_idx
+
+    def _looks_like_number(value: str) -> bool:
+        return bool(re.fullmatch(r"\d+[A-ZÄÖÜ]*", value.strip()))
+
+    def _looks_like_land(value: str) -> bool:
+        value = value.strip().upper()
+        return bool(re.fullmatch(r"[A-ZÄÖÜ]{1,4}", value))
+
+    def _is_plausible_person_name(value: str, allow_short_single_token: bool = False) -> bool:
+        parts = [_clean_token(part) for part in value.split() if _clean_token(part)]
+        if not parts:
+            return False
+        if any(_looks_like_name(part) for part in parts):
+            return True
+        if allow_short_single_token and len(parts) == 1:
+            token = parts[0]
+            if len(token) >= 2 and token[:1].isupper() and token.lower() not in {"bb", "be", "bw", "by", "hb", "he", "hh", "mv", "ni", "nw", "rp", "sh", "sl", "sn", "st", "th"}:
+                return True
+        return False
+
+    with pdfplumber.open(str(path)) as pdf:
+        for page in pdf.pages:
+            try:
+                tables = page.extract_tables() or []
+            except Exception:
+                tables = []
+
+            for table in tables:
+                if not table:
+                    continue
+
+                header_positions = (None, None)
+                data_started = False
+
+                for raw_row in table:
+                    row = [_clean_cell(cell) for cell in (raw_row or [])]
+                    if not any(row):
+                        continue
+
+                    first_idx, last_idx = _find_header_positions(row)
+                    if first_idx is not None and last_idx is not None:
+                        header_positions = (first_idx, last_idx)
+                        data_started = True
+                        continue
+
+                    if not data_started:
+                        continue
+
+                    first_idx, last_idx = header_positions
+                    if first_idx is None or last_idx is None:
+                        continue
+                    if max(first_idx, last_idx) >= len(row):
+                        continue
+
+                    firstname = row[first_idx].strip()
+                    surname = row[last_idx].strip()
+
+                    # Manche PDFs verschieben laufende Nummer/Ländercode in Nachbarspalten.
+                    # Für die Namensspalten selbst akzeptieren wir nur plausible Personennamen.
+                    if not surname and last_idx + 1 < len(row):
+                        candidate = row[last_idx + 1].strip()
+                        if _is_plausible_person_name(candidate):
+                            surname = candidate
+
+                    if not firstname and first_idx - 1 >= 0:
+                        candidate = row[first_idx - 1].strip()
+                        if _is_plausible_person_name(candidate) and not _looks_like_land(candidate) and not _looks_like_number(candidate):
+                            firstname = candidate
+
+                    if not _is_plausible_person_name(surname, allow_short_single_token=True):
+                        continue
+
+                    surname_parts = [_clean_token(part) for part in surname.split() if _clean_token(part)]
+                    if not surname_parts:
+                        continue
+                    surnames.append(" ".join(surname_parts))
+
+                    if include_firstnames and _is_plausible_person_name(firstname):
+                        first_parts = [_clean_token(part) for part in firstname.split() if _clean_token(part)]
+                        if first_parts:
+                            firstnames.append(" ".join(first_parts))
+
+    return sorted(set(surnames + firstnames), key=str.lower)
+
 def _extract_names_from_pdf_table(path: Path, include_firstnames: bool = False) -> list[str]:
-    # Für diese Teilnehmerverzeichnisse ist ein toleranter Textparser robuster als starre Tabellenlogik.
+    # Zuerst echte Tabellenzellen lesen. Das ist bei PDF-Formularen robuster als Fließtext,
+    # weil Spalten wie Vorname/Nachname dort meist sauberer erhalten bleiben.
+    table_names = _extract_names_from_pdf_tables(path, include_firstnames=include_firstnames)
+    if table_names:
+        return table_names
+
     raw_text = _extract_text_from_supported_file(path)
     lines = [ln.strip() for ln in raw_text.splitlines() if ln.strip()]
 
@@ -294,17 +417,7 @@ def _extract_text_from_supported_file(path: Path) -> str:
         return "\n".join(lines)
     if suffix == ".pdf":
         if pdfplumber is not None:
-            # Für Teilnehmerverzeichnisse ist die Tabellenlogik per pdfplumber der bevorzugte Weg.
-            texts = []
-            with pdfplumber.open(str(path)) as pdf:
-                for page in pdf.pages:
-                    try:
-                        txt = page.extract_text() or ""
-                    except Exception:
-                        txt = ""
-                    if txt.strip():
-                        texts.append(txt)
-            return "\n".join(texts)
+            return _pdfplumber_tables_to_text(path)
         if PdfReader is None:
             raise RuntimeError("Für PDF-Dateien wird pdfplumber oder pypdf oder PyPDF2 benötigt.")
         reader = PdfReader(str(path))
@@ -363,6 +476,11 @@ class BleepingTab(ttk.Frame):
         self.progress_win = None
         self.progress_img = None
         self.bleeping_service = BleepingService()
+        self._participant_import_surnames: list[str] = []
+        self._participant_import_firstnames: list[str] = []
+        self._participant_manual_baseline: list[str] = []
+        self._participant_import_source_path: str = ""
+        self._participant_option_trace_guard = False
         self._build()
 
     def _asset(self, name: str) -> Path:
@@ -446,6 +564,194 @@ class BleepingTab(ttk.Frame):
             return
         show_help_dialog(self, "Hilfe", help_text)
 
+    def _read_block_entries_from_widget(self) -> list[str]:
+        return [x.strip() for x in self.block_text.get("1.0", "end").splitlines() if x.strip()]
+
+    def _current_participant_import_entries(self) -> list[str]:
+        selected: list[str] = []
+        if self.participant_surnames_only.get():
+            selected.extend(self._participant_import_surnames)
+        if self.participant_include_firstnames.get():
+            selected.extend(self._participant_import_firstnames)
+        return sorted(set(selected), key=str.lower)
+
+    def _extract_manual_block_entries(self) -> list[str]:
+        if self._participant_manual_baseline:
+            return list(self._participant_manual_baseline)
+        current_entries = self._read_block_entries_from_widget()
+        imported = {entry.casefold() for entry in (self._participant_import_surnames + self._participant_import_firstnames)}
+        if not imported:
+            return current_entries
+        return [entry for entry in current_entries if entry.casefold() not in imported]
+
+    def _persist_participant_import_state(self) -> None:
+        if not self.app.project:
+            return
+        payload: dict[str, object] = {}
+        if self.app.project.app_state_file.exists():
+            try:
+                payload = json.loads(self.app.project.app_state_file.read_text(encoding="utf-8") or "{}")
+            except json.JSONDecodeError:
+                payload = {}
+        participant_state = {
+            "surnames": list(self._participant_import_surnames),
+            "firstnames": list(self._participant_import_firstnames),
+            "manual_baseline": list(self._participant_manual_baseline),
+            "source_path": self._participant_import_source_path,
+            "include_firstnames": bool(self.participant_include_firstnames.get()),
+        }
+        payload["participant_import"] = participant_state
+        self.app.project.app_state_file.parent.mkdir(parents=True, exist_ok=True)
+        self.app.project.app_state_file.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+    def _load_participant_import_state(self) -> None:
+        self._participant_import_surnames = []
+        self._participant_import_firstnames = []
+        self._participant_manual_baseline = []
+        if not self.app.project or not self.app.project.app_state_file.exists():
+            return
+        try:
+            payload = json.loads(self.app.project.app_state_file.read_text(encoding="utf-8") or "{}")
+        except json.JSONDecodeError:
+            return
+        participant_state = payload.get("participant_import", {})
+        if not isinstance(participant_state, dict):
+            return
+        surnames = participant_state.get("surnames", [])
+        firstnames = participant_state.get("firstnames", [])
+        manual_baseline = participant_state.get("manual_baseline", [])
+        source_path = participant_state.get("source_path", "")
+        if isinstance(surnames, list):
+            self._participant_import_surnames = [str(x).strip() for x in surnames if str(x).strip()]
+        if isinstance(firstnames, list):
+            self._participant_import_firstnames = [str(x).strip() for x in firstnames if str(x).strip()]
+        if isinstance(manual_baseline, list):
+            self._participant_manual_baseline = [str(x).strip() for x in manual_baseline if str(x).strip()]
+        if isinstance(source_path, str):
+            self._participant_import_source_path = source_path.strip()
+        try:
+            self._participant_option_trace_guard = True
+            self.participant_include_firstnames.set(bool(participant_state.get("include_firstnames", False)))
+        except Exception:
+            pass
+        finally:
+            self._participant_option_trace_guard = False
+
+    def _compute_participant_import_variants(self, file_path: Path) -> tuple[list[str], list[str]]:
+        if file_path.suffix.lower() == ".pdf":
+            surnames = _extract_names_from_pdf_table(file_path, include_firstnames=False)
+            names_with_firstnames = _extract_names_from_pdf_table(file_path, include_firstnames=True)
+        else:
+            raw_text = _extract_text_from_supported_file(file_path)
+            surnames = _extract_name_tokens_from_text(
+                raw_text,
+                surnames_only=True,
+                include_firstnames=False,
+            )
+            names_with_firstnames = _extract_name_tokens_from_text(
+                raw_text,
+                surnames_only=bool(self.participant_surnames_only.get()),
+                include_firstnames=True,
+            )
+        surname_set = {name.casefold() for name in surnames}
+        firstnames = [name for name in names_with_firstnames if name.casefold() not in surname_set]
+        return (
+            sorted(set(surnames), key=str.lower),
+            sorted(set(firstnames), key=str.lower),
+        )
+
+    def _rebuild_participant_import_from_source(self, announce: bool = False) -> bool:
+        source = self._participant_import_source_path.strip()
+        if not source:
+            return False
+        file_path = Path(source)
+        if not file_path.exists():
+            return False
+        manual_entries = self._extract_manual_block_entries()
+        surnames, firstnames = self._compute_participant_import_variants(file_path)
+        self._participant_import_surnames = surnames
+        self._participant_import_firstnames = firstnames
+        self._apply_participant_import_entries(manual_entries=manual_entries, announce=announce)
+        return True
+
+    def refresh_participant_import(self) -> None:
+        if not self.app.project:
+            self._set_status("Bitte zuerst ein Projekt laden.")
+            return
+        if not self._participant_import_source_path.strip():
+            self._set_status("Bitte zuerst eine Teilnehmerliste importieren.")
+            return
+        if not self._rebuild_participant_import_from_source(announce=False):
+            self._set_status("Die zuletzt importierte Teilnehmerliste konnte nicht erneut geladen werden.")
+            return
+
+        mode_txt = []
+        if self.participant_surnames_only.get():
+            mode_txt.append("Nachnamen")
+        if self.participant_include_firstnames.get():
+            mode_txt.append("Vornamen")
+        mode_label = " + ".join(mode_txt) if mode_txt else "keine Namensbestandteile"
+        self._set_status(
+            "Teilnehmerliste aktualisiert.\n"
+            f"Aktive Einträge aus der Teilnehmerliste: {len(self._current_participant_import_entries())} ({mode_label}).\n"
+            "Manuelle Blocklist-Einträge wurden beibehalten."
+        )
+
+    def _apply_participant_import_entries(self, manual_entries: list[str] | None = None, announce: bool = False) -> None:
+        if not self.app.project:
+            return
+        if manual_entries is None:
+            manual_entries = self._extract_manual_block_entries()
+        self._participant_manual_baseline = list(manual_entries)
+        merged = sorted(set(manual_entries + self._current_participant_import_entries()), key=str.lower)
+        self.block_text.delete("1.0", "end")
+        self.block_text.insert("1.0", "\n".join(merged))
+        self.block_text.see("1.0")
+        _safe_write_lines(self.app.project.blocklist_file, merged)
+        self._persist_participant_import_state()
+        if announce:
+            count = len(self._current_participant_import_entries())
+            mode_txt = []
+            if self.participant_surnames_only.get():
+                mode_txt.append("Nachnamen")
+            if self.participant_include_firstnames.get():
+                mode_txt.append("Vornamen")
+            mode_label = " + ".join(mode_txt) if mode_txt else "keine Namensbestandteile"
+            self._set_status(
+                f"Teilnehmerlisten-Modus aktualisiert.\n"
+                f"Aktive Einträge aus der Teilnehmerliste: {count} ({mode_label})."
+            )
+
+    def _on_participant_option_changed(self) -> None:
+        if self._participant_option_trace_guard:
+            return
+        if not self.app.project:
+            return
+        if not (self._participant_import_surnames or self._participant_import_firstnames):
+            return
+        if self._rebuild_participant_import_from_source(announce=True):
+            return
+        self._apply_participant_import_entries(announce=True)
+
+    def _on_participant_option_var_changed(self, *_args) -> None:
+        self._schedule_participant_option_changed()
+
+    def _schedule_participant_option_changed(self) -> None:
+        if self._participant_option_trace_guard:
+            return
+        self._participant_option_trace_guard = True
+        self.after_idle(self._run_participant_option_change)
+
+    def _run_participant_option_change(self) -> None:
+        try:
+            self._participant_option_trace_guard = False
+            self._on_participant_option_changed()
+        finally:
+            self._participant_option_trace_guard = False
+
     def _build(self):
 
         self.video_var = tk.StringVar()
@@ -456,6 +762,8 @@ class BleepingTab(ttk.Frame):
         self.allow_thr = tk.IntVar(value=96)
         self.participant_surnames_only = tk.BooleanVar(value=True)
         self.participant_include_firstnames = tk.BooleanVar(value=False)
+        self.participant_surnames_only.trace_add("write", self._on_participant_option_var_changed)
+        self.participant_include_firstnames.trace_add("write", self._on_participant_option_var_changed)
 
         top = ttk.LabelFrame(self, text="1) Vorbereitung")
         top.pack(fill="x", padx=8, pady=8)
@@ -481,7 +789,7 @@ class BleepingTab(ttk.Frame):
         prep_helpbar.grid(row=1, column=3, columnspan=3, sticky="e", padx=8, pady=(2, 4))
         ttk.Label(prep_helpbar, text="Hilfe zu Vorbereitung").pack(side="left")
         ttk.Button(prep_helpbar, text="?", width=3, command=lambda: self._toggle_help("prep_help_label")).pack(side="left", padx=(6, 0))
-        self.prep_help_label = "Ablauf in kurz: 1) Video oder WAV vorbereiten  2) words.json erzeugen  3) Kandidaten-Datei erzeugen  4) Kandidaten auswerten  5) In der Vorschau entscheiden  6) Times-Datei erzeugen.\n\nKandidaten-Datei = Trefferdatei mit Zeitstempel, Nachname und Kontext. Das ist der normale Arbeitsstand für die Prüfung.\n\nTeilnehmerliste = reine Namensliste ohne Zeitpunkte. Sie dient nur als Hilfe für die Blocklist-Vorlage und erzeugt noch keine Times-Datei.\n\nStandardfall: nur Nachnamen. Vornamen können bei Teilnehmerlisten zusätzlich übernommen werden, wenn das ausdrücklich gewünscht ist."
+        self.prep_help_label = "Ablauf in kurz: 1) Video oder WAV vorbereiten  2) words.json erzeugen  3) Kandidaten-Datei erzeugen  4) Kandidaten auswerten  5) In der Vorschau entscheiden  6) Times-Datei erzeugen.\n\nKandidaten-Datei = Trefferdatei mit Zeitstempel, Nachname und Kontext. Das ist der normale Arbeitsstand für die Prüfung.\n\nTeilnehmerliste = reine Namensliste ohne Zeitpunkte. Sie dient nur als Hilfe für die Blocklist-Vorlage und erzeugt noch keine Times-Datei.\n\nBei Teilnehmerlisten können Nachnamen, Vornamen oder beide gemeinsam übernommen werden."
 
         mid = ttk.Frame(self)
         mid.pack(fill="x", padx=8, pady=(0, 8))
@@ -519,14 +827,20 @@ class BleepingTab(ttk.Frame):
         participant_bar = ttk.Frame(left)
         participant_bar.pack(fill="x", padx=8, pady=(0, 6))
         ttk.Button(participant_bar, text="Teilnehmerliste importieren", command=self.import_participant_list, style="Accent.TButton").pack(side="left")
-        ttk.Checkbutton(participant_bar, text="Nur Nachnamen", variable=self.participant_surnames_only).pack(side="left", padx=(12, 8))
-        ttk.Checkbutton(participant_bar, text="Vornamen zusätzlich", variable=self.participant_include_firstnames).pack(side="left")
+        self.participant_surnames_check = ttk.Checkbutton(participant_bar, text="Nachnamen", variable=self.participant_surnames_only, command=self._schedule_participant_option_changed)
+        self.participant_surnames_check.pack(side="left", padx=(12, 8))
+        self.participant_firstnames_check = ttk.Checkbutton(participant_bar, text="Vornamen", variable=self.participant_include_firstnames, command=self._schedule_participant_option_changed)
+        self.participant_firstnames_check.pack(side="left")
+        ttk.Button(participant_bar, text="Akt.", width=5, command=self.refresh_participant_import, style="Accent.TButton").pack(side="left", padx=(8, 0))
+        for widget in (self.participant_surnames_check, self.participant_firstnames_check):
+            widget.bind("<ButtonRelease-1>", lambda _e: self._schedule_participant_option_changed(), add="+")
+            widget.bind("<KeyRelease-space>", lambda _e: self._schedule_participant_option_changed(), add="+")
 
         ttk.Label(participant_bar, text="").pack(side="left", expand=True, fill="x")
         ttk.Label(participant_bar, text="Hilfe zu Namenslisten und Regeln").pack(side="left", padx=(18, 6))
         ttk.Button(participant_bar, text="?", width=3, command=lambda: self._toggle_help("lists_help_label")).pack(side="left")
 
-        self.lists_help_label = "Teilnehmerlisten können als TXT, CSV, XLSX, DOCX oder PDF importiert werden. Ergebnis ist immer nur eine Namensbasis für die Blocklist-Vorlage.\n\nDie Allowlist ist stärker: Ein dort eingetragener Name gewinnt bei der späteren Auswertung gegen die Blocklist.\n\nBlocklist = Namen, die besonders genau geprüft werden sollen. Allowlist = Namen oder Schreibweisen, die nicht gebleept werden sollen.\n\nDie Blocklist erzwingt also keinen Bleep automatisch. Maßgeblich ist immer die spätere Auswertung in Verbindung mit der Vorschau."
+        self.lists_help_label = "Teilnehmerlisten können als TXT, CSV, XLSX, DOCX oder PDF importiert werden. Ergebnis ist immer nur eine Namensbasis für die Blocklist-Vorlage.\n\nDie Allowlist ist stärker: Ein dort eingetragener Name gewinnt bei der späteren Auswertung gegen die Blocklist.\n\nBlocklist = Namen, die besonders genau geprüft werden sollen. Allowlist = Namen oder Schreibweisen, die nicht gebleept werden sollen.\n\nBei Teilnehmerlisten können Nachnamen, Vornamen oder beide gemeinsam übernommen werden. Die Blocklist erzwingt keinen Bleep automatisch; maßgeblich ist immer die spätere Auswertung."
 
         for c in range(4):
             right.grid_columnconfigure(c, weight=0)
@@ -596,6 +910,7 @@ class BleepingTab(ttk.Frame):
         if not self.app.project:
             return
         p = self.app.project
+        self._load_participant_import_state()
         self.video_combo["values"] = _list_files(p.input_video_dir, {".mp4", ".mov", ".mkv", ".avi", ".m4v", ".wmv"})
         self.wav_combo["values"] = _list_files(p.transcription_wav_dir, {".wav"})
         self.json_combo["values"] = _list_files(p.transcription_json_dir, {".json"})
@@ -608,14 +923,23 @@ class BleepingTab(ttk.Frame):
             self.json_var.set(self.json_combo["values"][0])
         if self.candidate_combo["values"] and (not self.candidate_var.get() or self.candidate_var.get() not in self.candidate_combo["values"]):
             self.candidate_var.set(self.candidate_combo["values"][0])
-        self.block_text.delete("1.0", "end"); self.block_text.insert("1.0", "\n".join(_safe_read_lines(p.blocklist_file)))
+        if self._participant_import_surnames or self._participant_import_firstnames:
+            displayed = sorted(set(self._participant_manual_baseline + self._current_participant_import_entries()), key=str.lower)
+        else:
+            displayed = _safe_read_lines(p.blocklist_file)
+        self.block_text.delete("1.0", "end"); self.block_text.insert("1.0", "\n".join(displayed))
         self.allow_text.delete("1.0", "end"); self.allow_text.insert("1.0", "\n".join(_safe_read_lines(p.allowlist_file)))
 
     def save_lists(self):
         if not self.app.project:
             return
         p = self.app.project
-        _safe_write_lines(p.blocklist_file, [x.strip() for x in self.block_text.get("1.0", "end").splitlines() if x.strip()])
+        current_entries = [x.strip() for x in self.block_text.get("1.0", "end").splitlines() if x.strip()]
+        if self._participant_import_surnames or self._participant_import_firstnames:
+            imported = {entry.casefold() for entry in self._current_participant_import_entries()}
+            self._participant_manual_baseline = [entry for entry in current_entries if entry.casefold() not in imported]
+            self._persist_participant_import_state()
+        _safe_write_lines(p.blocklist_file, current_entries)
         _safe_write_lines(p.allowlist_file, [x.strip() for x in self.allow_text.get("1.0", "end").splitlines() if x.strip()])
         self._set_status("Projekt gespeichert: Listen wurden gesichert.")
 
@@ -635,36 +959,26 @@ class BleepingTab(ttk.Frame):
             return
         try:
             file_path = Path(path)
-            surnames_only = bool(self.participant_surnames_only.get())
-            include_firstnames = bool(self.participant_include_firstnames.get())
-
-            if file_path.suffix.lower() == ".pdf":
-                names = _extract_names_from_pdf_table(
-                    file_path,
-                    include_firstnames=include_firstnames,
-                )
-            else:
-                raw_text = _extract_text_from_supported_file(file_path)
-                names = _extract_name_tokens_from_text(
-                    raw_text,
-                    surnames_only=surnames_only,
-                    include_firstnames=include_firstnames,
-                )
-            if not names:
+            surnames, firstnames = self._compute_participant_import_variants(file_path)
+            if not surnames:
                 self._set_status("Es konnten aus der Teilnehmerliste keine plausiblen Namen gelesen werden.")
                 return
 
-            existing = [x.strip() for x in self.block_text.get("1.0", "end").splitlines() if x.strip()]
-            merged = sorted(set(existing + names), key=str.lower)
-            self.block_text.delete("1.0", "end")
-            self.block_text.insert("1.0", "\n".join(merged))
+            manual_entries = self._extract_manual_block_entries()
+            self._participant_import_source_path = str(file_path)
+            self._participant_import_surnames = sorted(set(surnames), key=str.lower)
+            self._participant_import_firstnames = sorted(set(firstnames), key=str.lower)
+            self._apply_participant_import_entries(manual_entries=manual_entries, announce=False)
 
-            mode_txt = "Nachnamen"
-            if include_firstnames:
-                mode_txt += " + optionale Vornamen"
+            mode_txt = []
+            if self.participant_surnames_only.get():
+                mode_txt.append("Nachnamen")
+            if self.participant_include_firstnames.get():
+                mode_txt.append("Vornamen")
+            mode_label = " + ".join(mode_txt) if mode_txt else "keine Namensbestandteile"
             self._set_status(
                 f"Teilnehmerliste importiert: {Path(path).name}\n"
-                f"Übernommen in Blocklist-Vorlage: {len(names)} Einträge ({mode_txt}).\n"
+                f"Übernommen in Blocklist-Vorlage: {len(self._current_participant_import_entries())} Einträge ({mode_label}).\n"
                 f"Hinweis: Das ist noch keine Kandidaten-Datei mit Zeitpunkten, sondern nur eine Namensbasis für die spätere Auswertung."
             )
         except Exception as e:

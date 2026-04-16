@@ -53,6 +53,99 @@ class _BleepingTabBridge:
         self.owner.block_text.insert("1.0", bt.block_text.get("1.0", "end"))
         self.owner.allow_text.delete("1.0", "end")
         self.owner.allow_text.insert("1.0", bt.allow_text.get("1.0", "end"))
+        if hasattr(self.owner, "_update_list_count_labels"):
+            self.owner._update_list_count_labels()
+        return bt
+
+    def refresh(self):
+        bt = self.tab()
+        if bt is None:
+            return None
+        bt.refresh()
+        self.sync_from_tab()
+        return bt
+
+    def make_wav(self):
+        bt = self.sync_to_tab()
+        if bt is None:
+            return None
+        bt.make_wav()
+        self.sync_from_tab()
+        return bt
+
+    def make_words_json_stub(self):
+        bt = self.sync_to_tab()
+        if bt is None:
+            return None
+        bt.make_words_json_stub()
+        self.sync_from_tab()
+        return bt
+
+    def make_candidates(self):
+        bt = self.sync_to_tab()
+        if bt is None:
+            return None
+        bt.make_candidates()
+        self.sync_from_tab()
+        return bt
+
+    def import_participant_list(self):
+        bt = self.sync_to_tab()
+        if bt is None:
+            return None
+        bt.import_participant_list()
+        self.sync_from_tab()
+        return bt
+
+    def refresh_participant_import(self):
+        bt = self.sync_to_tab()
+        if bt is None:
+            return None
+        if not hasattr(bt, "refresh_participant_import"):
+            return None
+        bt.refresh_participant_import()
+        self.sync_from_tab()
+        return bt
+
+    def fill_blocklist_from_candidates(self):
+        bt = self.sync_to_tab()
+        if bt is None:
+            return None
+        bt.fill_blocklist_from_candidates()
+        self.sync_from_tab()
+        return bt
+
+    def save_lists(self):
+        bt = self.sync_to_tab()
+        if bt is None:
+            return None
+        bt.save_lists()
+        self.sync_from_tab()
+        return bt
+
+    def choose_candidate(self):
+        bt = self.sync_to_tab()
+        if bt is None:
+            return None
+        bt.choose_candidate()
+        self.sync_from_tab()
+        return bt
+
+    def evaluate_preview_rows(self):
+        bt = self.sync_to_tab()
+        if bt is None:
+            return None
+        bt.evaluate()
+        rows = bt._current_preview_rows()
+        self.sync_from_tab()
+        return rows
+
+    def quick(self):
+        bt = self.sync_to_tab()
+        if bt is None:
+            return None
+        bt.quick()
+        self.sync_from_tab()
         return bt
 
 
@@ -249,17 +342,30 @@ class CombinedReviewTab(HitReviewTab):
         lists.grid(row=0, column=1, sticky="nsew", padx=6)
         lists.columnconfigure(0, weight=1)
         lists.columnconfigure(1, weight=1)
-        ttk.Label(lists, text="Blocklist (optional)").grid(row=0, column=0, sticky="w", padx=8, pady=(8, 2))
-        ttk.Label(lists, text="Allowlist (optional)").grid(row=0, column=1, sticky="w", padx=8, pady=(8, 2))
+        block_head = ttk.Frame(lists)
+        block_head.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 2))
+        block_head.columnconfigure(0, weight=1)
+        ttk.Label(block_head, text="Blocklist (optional)").grid(row=0, column=0, sticky="w")
+        self.block_count_label = ttk.Label(block_head, text="0")
+        self.block_count_label.grid(row=0, column=1, sticky="e")
+        allow_head = ttk.Frame(lists)
+        allow_head.grid(row=0, column=1, sticky="ew", padx=8, pady=(8, 2))
+        allow_head.columnconfigure(0, weight=1)
+        ttk.Label(allow_head, text="Allowlist (optional)").grid(row=0, column=0, sticky="w")
+        self.allow_count_label = ttk.Label(allow_head, text="0")
+        self.allow_count_label.grid(row=0, column=1, sticky="e")
         self.block_text = tk.Text(lists, height=5, width=32, wrap="none", undo=True)
         self.block_text.grid(row=1, column=0, sticky="nsew", padx=(8, 4), pady=(0, 6))
         self.allow_text = tk.Text(lists, height=5, width=32, wrap="none", undo=True)
         self.allow_text.grid(row=1, column=1, sticky="nsew", padx=(4, 8), pady=(0, 6))
+        self.block_text.bind("<<Modified>>", self._on_list_text_modified, add="+")
+        self.allow_text.bind("<<Modified>>", self._on_list_text_modified, add="+")
         list_bar = ttk.Frame(lists)
         list_bar.grid(row=2, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 6))
         ttk.Button(list_bar, text="Teilnehmerliste importieren", command=self.import_participant_list, style="Accent.TButton").pack(side="left")
-        ttk.Checkbutton(list_bar, text="Nur Nachnamen", variable=self.participant_surnames_only).pack(side="left", padx=(12, 8))
-        ttk.Checkbutton(list_bar, text="Vornamen zusätzlich", variable=self.participant_include_firstnames).pack(side="left")
+        ttk.Checkbutton(list_bar, text="Nachnamen", variable=self.participant_surnames_only).pack(side="left", padx=(12, 8))
+        ttk.Checkbutton(list_bar, text="Vornamen", variable=self.participant_include_firstnames).pack(side="left")
+        ttk.Button(list_bar, text="Akt.", width=5, command=self.refresh_participant_import, style="Accent.TButton").pack(side="left", padx=(8, 0))
         list_bar2 = ttk.Frame(lists)
         list_bar2.grid(row=3, column=0, columnspan=2, sticky="ew", padx=8, pady=(0, 8))
         for c in range(3):
@@ -566,49 +672,64 @@ class CombinedReviewTab(HitReviewTab):
         self._bleeping_bridge().sync_from_tab()
 
     def make_wav(self):
-        bt = self._bleeping_bridge().sync_to_tab()
-        if bt is None:
+        if self._bleeping_bridge().make_wav() is None:
             return
-        bt.make_wav()
         self.refresh()
 
+    def _list_entry_count(self, widget: tk.Text) -> int:
+        return len([x.strip() for x in widget.get("1.0", "end").splitlines() if x.strip()])
+
+    def _update_list_count_labels(self) -> None:
+        if hasattr(self, "block_count_label"):
+            self.block_count_label.configure(text=str(self._list_entry_count(self.block_text)))
+        if hasattr(self, "allow_count_label"):
+            self.allow_count_label.configure(text=str(self._list_entry_count(self.allow_text)))
+
+    def _on_list_text_modified(self, event=None) -> None:
+        widget = event.widget if event is not None else None
+        self._update_list_count_labels()
+        try:
+            if widget is not None:
+                widget.edit_modified(False)
+        except Exception:
+            pass
+
     def make_words_json_stub(self):
-        bt = self._bleeping_bridge().sync_to_tab()
-        if bt is None:
+        if self._bleeping_bridge().make_words_json_stub() is None:
             return
-        bt.make_words_json_stub()
         self.refresh()
 
     def make_candidates(self):
-        bt = self._bleeping_bridge().sync_to_tab()
-        if bt is None:
+        if self._bleeping_bridge().make_candidates() is None:
             return
-        bt.make_candidates()
         self.refresh()
 
     def import_participant_list(self):
-        bt = self._bleeping_bridge().sync_to_tab()
-        if bt is None:
+        if self._bleeping_bridge().import_participant_list() is None:
             return
-        bt.import_participant_list()
+        self.refresh()
+
+    def refresh_participant_import(self):
+        if self._bleeping_bridge().refresh_participant_import() is None:
+            self._set_status("Bitte zuerst eine Teilnehmerliste importieren.")
+            return
         self.refresh()
 
     def fill_blocklist_from_candidates(self):
-        bt = self._bleeping_bridge().sync_to_tab()
-        if bt is None:
+        if self._bleeping_bridge().fill_blocklist_from_candidates() is None:
             return
-        bt.fill_blocklist_from_candidates()
-        self._bleeping_bridge().sync_from_tab()
         self._set_status("Blocklist aus Kandidaten-Datei übernommen.")
 
     def clear_blocklist(self):
         self.block_text.delete("1.0", "end")
         self._sync_to_bleeping()
+        self._update_list_count_labels()
         self._set_status("Blocklist geleert.")
 
     def clear_allowlist(self):
         self.allow_text.delete("1.0", "end")
         self._sync_to_bleeping()
+        self._update_list_count_labels()
         self._set_status("Allowlist geleert.")
 
     def fill_allowlist_from_candidates(self):
@@ -722,27 +843,21 @@ class CombinedReviewTab(HitReviewTab):
         return None if point is None else point.seconds
 
     def save_lists(self):
-        bt = self._bleeping_bridge().sync_to_tab()
-        if bt is None:
+        if self._bleeping_bridge().save_lists() is None:
             return
-        bt.save_lists()
         self._set_status("Projektlisten gespeichert.")
 
     def choose_candidate(self):
-        bt = self._bleeping_bridge().sync_to_tab()
-        if bt is None:
+        if self._bleeping_bridge().choose_candidate() is None:
             return
-        bt.choose_candidate()
-        self._bleeping_bridge().sync_from_tab()
         self.refresh()
 
     def refresh(self):
         p = self._project()
-        bt = self._bleeping_bridge().tab()
-        if p is None or bt is None:
+        if p is None:
             return
-        bt.refresh()
-        self._bleeping_bridge().sync_from_tab()
+        if self._bleeping_bridge().refresh() is None:
+            return
         self.video_combo["values"] = _list_files(p.input_video_dir, VIDEO_EXTS)
         self.wav_combo["values"] = _list_files(p.transcription_wav_dir, {".wav"})
         self.json_combo["values"] = _list_files(p.transcription_json_dir, {".json"})
@@ -755,6 +870,7 @@ class CombinedReviewTab(HitReviewTab):
         if default_medium:
             self.media_var.set(default_medium)
         self._pull_bleep_params_from_ffmpeg()
+        self._update_list_count_labels()
     def _build_hits_from_preview_rows(self, rows):
         return self._hit_list_helper().build_hits_from_preview_rows(rows)
     # Archiviert: frühere _rebuild_tree-Variante war weiter unten in derselben
@@ -766,12 +882,10 @@ class CombinedReviewTab(HitReviewTab):
             if iid in self.hit_tree.get_children():
                 self.hit_tree.item(iid, values=(hit.get("line_number", index + 1), hit["begin_ts"], hit["end_ts"], hit["label"], hit["review_status"], hit.get("reason", "") or hit["source_decision"]))
     def evaluate_into_review(self):
-        bt = self._bleeping_bridge().sync_to_tab()
-        if bt is None:
-            return
         self.save_lists()
-        bt.evaluate()
-        rows = bt._current_preview_rows()
+        rows = self._bleeping_bridge().evaluate_preview_rows()
+        if rows is None:
+            return
         self.hits = self._build_hits_from_preview_rows(rows)
         default_medium = self._choose_default_review_medium()
         if default_medium:
@@ -883,10 +997,8 @@ class CombinedReviewTab(HitReviewTab):
         except Exception as exc:
             self._set_status(f"Preview konnte nicht geladen werden: {exc}")
     def quick(self):
-        bt = self._bleeping_bridge().sync_to_tab()
-        if bt is None:
+        if self._bleeping_bridge().quick() is None:
             return
-        bt.quick()
         self._set_status("Schnell-Nachbleepen vorbereitet.")
     def _selected_indices(self) -> list[int]:
         return self._hit_list_helper().selected_indices()

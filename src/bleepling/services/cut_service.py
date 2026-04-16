@@ -7,6 +7,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from bleepling.services.time_service import format_time_point, parse_time_point
+
 
 class CutService:
     def _ffmpeg(self) -> str | None:
@@ -35,26 +37,13 @@ class CutService:
         return text[:150] or default
 
     def seconds_to_ts(self, seconds: float) -> str:
-        if seconds < 0:
-            seconds = 0.0
-        ms_total = int(round(seconds * 1000))
-        s, ms = divmod(ms_total, 1000)
-        h, rem = divmod(s, 3600)
-        m, sec = divmod(rem, 60)
-        return f"{h:02d}:{m:02d}:{sec:02d}.{ms:03d}"
+        return format_time_point(seconds, clamp_zero=True)
 
     def ts_to_seconds(self, value: str) -> float:
-        value = (value or "").strip()
-        if not value:
-            raise ValueError("Leerer Zeitwert.")
-        m = re.fullmatch(r"(\d{1,2}):(\d{2}):(\d{2})(?:[\.,](\d{1,3}))?", value)
-        if not m:
+        point = parse_time_point(value)
+        if point is None:
             raise ValueError("Zeitformat muss HH:MM:SS.mmm sein.")
-        h = int(m.group(1))
-        mi = int(m.group(2))
-        s = int(m.group(3))
-        ms = int((m.group(4) or "0").ljust(3, "0")[:3])
-        return float(h * 3600 + mi * 60 + s) + ms / 1000.0
+        return point.seconds
 
     def probe_duration(self, media_path: Path) -> float | None:
         ffprobe = self._ffprobe()

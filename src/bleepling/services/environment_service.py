@@ -7,7 +7,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 from bleepling.models.project import Project
 
@@ -46,21 +46,40 @@ class EnvironmentService:
         "cudnn_adv64_9.dll",
     ]
 
-    def diagnose(self, project: Project | None, extra_cuda_paths: Iterable[str] | None = None) -> list[DiagnosticItem]:
+    def diagnose(
+        self,
+        project: Project | None,
+        extra_cuda_paths: Iterable[str] | None = None,
+        progress_callback: Callable[[DiagnosticItem], None] | None = None,
+    ) -> list[DiagnosticItem]:
         items: list[DiagnosticItem] = []
-        items.append(self._diagnose_python())
-        items.append(self._diagnose_ffmpeg())
-        items.append(self._diagnose_vlc_python_module())
-        items.extend(self._diagnose_vlc_runtime())
-        items.append(self._diagnose_python_module("faster_whisper", "Python-Modul faster-whisper"))
-        items.append(self._diagnose_python_module("ctranslate2", "Python-Modul ctranslate2"))
-        items.append(self._diagnose_python_module("openpyxl", "Python-Modul openpyxl (XLSX-Import)"))
-        items.append(self._diagnose_python_module("docx", "Python-Modul python-docx (DOCX-Import)"))
-        items.append(self._diagnose_python_module("pdfplumber", "Python-Modul pdfplumber (PDF-Tabellenimport)"))
-        items.append(self._diagnose_any_python_module(("pypdf", "PyPDF2"), "Python-Modul pypdf/PyPDF2 (einfacher PDF-Import)"))
-        items.extend(self._diagnose_cuda(extra_cuda_paths or []))
+
+        def collect(item: DiagnosticItem):
+            items.append(item)
+            if progress_callback is not None:
+                progress_callback(item)
+
+        collect(self._diagnose_python())
+        collect(self._diagnose_ffmpeg())
+        collect(self._diagnose_vlc_python_module())
+
+        vlc_runtime_items = self._diagnose_vlc_runtime()
+        for item in vlc_runtime_items:
+            collect(item)
+
+        collect(self._diagnose_python_module("faster_whisper", "Python-Modul faster-whisper"))
+        collect(self._diagnose_python_module("ctranslate2", "Python-Modul ctranslate2"))
+        collect(self._diagnose_python_module("openpyxl", "Python-Modul openpyxl (XLSX-Import)"))
+        collect(self._diagnose_python_module("docx", "Python-Modul python-docx (DOCX-Import)"))
+        collect(self._diagnose_python_module("pdfplumber", "Python-Modul pdfplumber (PDF-Tabellenimport)"))
+        collect(self._diagnose_any_python_module(("pypdf", "PyPDF2"), "Python-Modul pypdf/PyPDF2 (einfacher PDF-Import)"))
+
+        cuda_items = self._diagnose_cuda(extra_cuda_paths or [])
+        for item in cuda_items:
+            collect(item)
+
         if project:
-            items.append(self._diagnose_project_log(project))
+            collect(self._diagnose_project_log(project))
         return items
 
     def get_recommended_cuda_paths(self, extra_cuda_paths: Iterable[str] | None = None) -> list[Path]:

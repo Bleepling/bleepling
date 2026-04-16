@@ -160,20 +160,14 @@ class BleeplingApp(tk.Tk):
         self.status_label.pack(fill="x", padx=10, pady=(0, 8))
 
     def _on_tab_changed(self, event=None):
-        for tab in [
-            self.project_tab,
-            self.media_tab,
-            self.cut_tab,
-            self.bleeping_tab,
-            self.ffmpeg_tab,
-            self.targeted_edit_tab,
-            self.hit_review_tab,
-            self.combined_review_tab,
-            self.titlecards_tab,
-            self.settings_tab,
-        ]:
+        selected_tab = None
+        try:
+            selected_tab = self.nametowidget(self.notebook.select())
+        except Exception:
+            pass
+        if selected_tab is not None:
             try:
-                tab.refresh()
+                selected_tab.refresh()
             except Exception:
                 pass
 

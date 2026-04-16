@@ -19,6 +19,7 @@ except Exception:
     ImageTk = None
 
 from bleepling.services.cut_service import CutService
+from bleepling.utils.help_dialog import show_help_dialog
 from bleepling.utils.file_types import VIDEO_EXTENSIONS
 
 
@@ -229,21 +230,7 @@ class CutTab(ttk.Frame):
 
 
     def _show_help_dialog(self, title: str, body: str):
-        win = tk.Toplevel(self.winfo_toplevel())
-        win.title(title)
-        win.transient(self.winfo_toplevel())
-        win.resizable(False, False)
-        frame = ttk.Frame(win, padding=14)
-        frame.pack(fill="both", expand=True)
-        ttk.Label(frame, text=title, font=("Segoe UI", 10, "bold")).pack(anchor="w")
-        msg = tk.Message(frame, text=body, width=620, justify="left")
-        msg.pack(fill="both", expand=True, pady=(10, 12))
-        ttk.Button(frame, text="Schließen", command=win.destroy, style="Accent.TButton").pack(anchor="e")
-        win.update_idletasks()
-        root = self.winfo_toplevel()
-        rx, ry, rw, rh = root.winfo_rootx(), root.winfo_rooty(), root.winfo_width(), root.winfo_height()
-        ww, wh = win.winfo_width(), win.winfo_height()
-        win.geometry(f"+{rx + max(0, (rw-ww)//2)}+{ry + max(0, (rh-wh)//2)}")
+        show_help_dialog(self, title, body)
 
     def show_help_sources(self):
         self._show_help_dialog(
@@ -492,6 +479,8 @@ class CutTab(ttk.Frame):
         self.working_video_dir_var.set(str(self.cut_service.working_video_dir(p)))
         self.clip_output_dir_var.set(str(self.cut_service.clips_output_dir(p)))
         self._try_load_existing_working_video()
+        if self._should_poll_player() and self.player_loaded_path is not None and self._poll_job is None:
+            self._poll_position()
         self._set_status("Bereit.")
 
     def _project_videos(self) -> list[str]:
@@ -905,12 +894,32 @@ class CutTab(ttk.Frame):
         duration = self.cut_service.probe_duration(self.working_video_path) or 0.0
         self.player_duration_ms = int(round(duration * 1000))
         self.seek_var.set(0.0)
-        if self._poll_job is None:
+        if self._poll_job is None and self._should_poll_player():
             self._poll_position()
         self._redraw_cut_window()
 
+    def _should_poll_player(self) -> bool:
+        if self.player is None or self.player_loaded_path is None:
+            return False
+        try:
+            if self.cut_window is not None and self.cut_window.winfo_exists():
+                return True
+        except Exception:
+            pass
+        try:
+            notebook = getattr(self.app, "notebook", None)
+            if notebook is not None:
+                selected = self.nametowidget(notebook.select())
+                if selected is self:
+                    return True
+        except Exception:
+            pass
+        return False
+
     def _poll_position(self):
         self._poll_job = None
+        if not self._should_poll_player():
+            return
         try:
             if self.player is not None:
                 ms = int(self.player.get_time())

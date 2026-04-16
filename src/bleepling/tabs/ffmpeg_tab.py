@@ -9,6 +9,15 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, simpledialog, ttk
 
+from bleepling.services.render_service import (
+    build_bleep_audio_filter,
+    find_ffmpeg,
+    find_ffprobe,
+    parse_progress_line,
+    run_simple_command,
+)
+from bleepling.services.time_service import parse_time_point, parse_times_line
+
 try:
     from PIL import Image, ImageTk
 except Exception:
@@ -79,32 +88,21 @@ def _safe_int(value, default=0):
         return default
 
 def _parse_hhmmss_to_seconds(value: str) -> float | None:
-    try:
-        parts = value.strip().split(":")
-        if len(parts) != 3:
-            return None
-        h = int(parts[0]); mm = int(parts[1]); sec = float(parts[2])
-        return h * 3600 + mm * 60 + sec
-    except Exception:
-        return None
+    point = parse_time_point(value)
+    return None if point is None else point.seconds
 
 def _parse_times_line(line: str):
-    raw = (line or "").strip()
-    if not raw:
+    # Kompatibilitätsadapter: Die zentrale Einstiegsschicht liefert ParsedTimeRef.
+    # Dieser Altpfad gibt vorerst weiterhin die bisherige Tuple-Form zurück,
+    # damit die bestehende Renderlogik unverändert bleibt.
+    parsed = parse_times_line(line)
+    if parsed is None:
         return None
-    if "-->" in raw:
-        left, right = [x.strip() for x in raw.split("-->", 1)]
-        start = _parse_hhmmss_to_seconds(left)
-        end = _parse_hhmmss_to_seconds(right)
-        if start is None or end is None:
-            return None
-        if end < start:
-            start, end = end, start
-        return start, end
-    center = _parse_hhmmss_to_seconds(raw)
-    if center is None:
-        return None
-    return center, None
+    if parsed.kind == "range" and parsed.time_range is not None:
+        return parsed.time_range.start_seconds, parsed.time_range.end_seconds
+    if parsed.kind == "point" and parsed.point is not None:
+        return parsed.point.seconds, None
+    return None
 
 def _fps_from_ratio(ratio: str) -> float:
     try:
@@ -144,10 +142,10 @@ class FFmpegTab(ttk.Frame):
         return p.root_path / "04_output" / "audio"
 
     def _ffmpeg(self):
-        return shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+        return find_ffmpeg()
 
     def _ffprobe(self):
-        return shutil.which("ffprobe") or shutil.which("ffprobe.exe")
+        return find_ffprobe()
 
     def _presets_file(self) -> Path:
         base = Path.home() / ".bleepling"
@@ -564,18 +562,8 @@ class FFmpegTab(ttk.Frame):
             parsed.append((i, start, end, dur))
         if not parsed:
             raise RuntimeError("Es konnten keine gültigen Zeitpunkte gelesen werden.")
-        items = ["[0:a]anull[src0]"]
-        current = "src0"
-        for idx, start, end, dur in parsed:
-            nxt = f"src{idx+1}"
-            items.append(f"[{current}]volume=enable='between(t,{start:.3f},{end:.3f})':volume=0[{nxt}]")
-            current = nxt
-        items.append(f"[{current}]anull[muted]")
-        for idx, start, end, dur in parsed:
-            items.append(f"sine=f={freq}:sample_rate=48000:d={dur:.3f},volume={gain},adelay={int(start*1000)}:all=1[b{idx}]")
-        amix_inputs = "[muted]" + "".join(f"[b{idx}]" for idx, *_ in parsed)
-        items.append(f"{amix_inputs}amix=inputs={1+len(parsed)}:normalize=0[aout]")
-        return ";".join(items), len(parsed), interval_mode
+        filter_intervals = [(start, end, dur) for _, start, end, dur in parsed]
+        return build_bleep_audio_filter(filter_intervals, freq, gain, sample_rate=48000), len(parsed), interval_mode
 
     def preview_command(self):
         try:
@@ -667,7 +655,7 @@ class FFmpegTab(ttk.Frame):
         if self.progress_win is not None: self.after(150, self._poll_render_queue)
 
     def _run_simple_cmd(self, cmd):
-        return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        return run_simple_command(cmd)
 
     def _run_video_progress_cmd(self, cmd, duration, stage_name):
         self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
@@ -675,18 +663,22 @@ class FFmpegTab(ttk.Frame):
         if self.proc.stdout is not None:
             for raw_line in self.proc.stdout:
                 line = (raw_line or "").strip()
-                if not line: continue
-                if line.startswith("out_time_ms="):
-                    out_time_sec = _safe_float(line.split("=",1)[1],0.0)/1_000_000.0
-                    if duration: percent=max(percent,min(100.0,(out_time_sec/duration)*100.0)); self.render_queue.put({"kind":"progress","percent":percent,"label":f"{stage_name} | {percent:.1f} % | Medienzeit {_fmt_mmss(out_time_sec)} | Größe {size_text} | Speed {speed_text}"})
-                elif line.startswith("out_time_us="):
-                    out_time_sec = _safe_float(line.split("=",1)[1],0.0)/1_000_000.0
-                    if duration: percent=max(percent,min(100.0,(out_time_sec/duration)*100.0)); self.render_queue.put({"kind":"progress","percent":percent,"label":f"{stage_name} | {percent:.1f} % | Medienzeit {_fmt_mmss(out_time_sec)} | Größe {size_text} | Speed {speed_text}"})
-                elif line.startswith("total_size="):
-                    size_text = _fmt_mb(_safe_int(line.split("=",1)[1],0)); self.render_queue.put({"kind":"progress","percent":percent,"label":f"{stage_name} | {percent:.1f} % | Größe {size_text} | Speed {speed_text}"})
-                elif line.startswith("speed="):
-                    speed_text = line.split("=",1)[1].strip() or "-"; self.render_queue.put({"kind":"progress","percent":percent,"label":f"{stage_name} | {percent:.1f} % | Größe {size_text} | Speed {speed_text}"})
-                elif line.startswith("progress=end"):
+                event = parse_progress_line(line)
+                if event is None:
+                    continue
+                event_kind, event_value = event
+                if event_kind == "out_time_seconds":
+                    out_time_sec = float(event_value)
+                    if duration:
+                        percent = max(percent, min(100.0, (out_time_sec / duration) * 100.0))
+                    self.render_queue.put({"kind":"progress","percent":percent,"label":f"{stage_name} | {percent:.1f} % | Medienzeit {_fmt_mmss(out_time_sec)} | Größe {size_text} | Speed {speed_text}"})
+                elif event_kind == "total_size":
+                    size_text = _fmt_mb(int(event_value))
+                    self.render_queue.put({"kind":"progress","percent":percent,"label":f"{stage_name} | {percent:.1f} % | Größe {size_text} | Speed {speed_text}"})
+                elif event_kind == "speed":
+                    speed_text = str(event_value)
+                    self.render_queue.put({"kind":"progress","percent":percent,"label":f"{stage_name} | {percent:.1f} % | Größe {size_text} | Speed {speed_text}"})
+                elif event_kind == "progress" and event_value == "end":
                     self.render_queue.put({"kind":"progress","percent":100.0,"label":f"{stage_name} | 100.0 % | Größe {size_text} | Speed {speed_text}"})
         if self.proc.stderr is not None: stderr_parts.append(self.proc.stderr.read())
         rc = self.proc.wait(); self.proc = None

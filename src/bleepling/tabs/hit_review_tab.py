@@ -12,6 +12,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
 
+from bleepling.services.time_service import TimeRange, format_time_point, parse_time_point, parse_times_line
+
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".m4v", ".wmv"}
 AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"}
 MEDIA_EXTS = VIDEO_EXTS | AUDIO_EXTS
@@ -30,32 +32,12 @@ def _list_files(directory: Path, exts: set[str]):
 
 
 def _parse_timestamp(value: str) -> float | None:
-    text = (value or "").strip().replace(",", ".")
-    if not text:
-        return None
-    try:
-        parts = text.split(":")
-        if len(parts) != 3:
-            return None
-        h = int(parts[0])
-        m = int(parts[1])
-        s = float(parts[2])
-        if h < 0 or m < 0 or s < 0:
-            return None
-        return h * 3600 + m * 60 + s
-    except Exception:
-        return None
+    point = parse_time_point(value)
+    return None if point is None else point.seconds
 
 
 def _format_timestamp(seconds: float) -> str:
-    total_ms = max(0, int(round(float(seconds) * 1000)))
-    h = total_ms // 3600000
-    total_ms %= 3600000
-    m = total_ms // 60000
-    total_ms %= 60000
-    s = total_ms // 1000
-    ms = total_ms % 1000
-    return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
+    return format_time_point(float(seconds), clamp_zero=True)
 
 
 def _normalize_token(text: str) -> str:
@@ -357,6 +339,7 @@ class HitReviewTab(ttk.Frame):
                         {
                             "start": float(w.get("start", 0.0)),
                             "end": float(w.get("end", 0.0)),
+                            "time_range": TimeRange(float(w.get("start", 0.0)), float(w.get("end", 0.0))),
                             "word": raw,
                             "norm": norm,
                         }
@@ -395,6 +378,7 @@ class HitReviewTab(ttk.Frame):
                     "adjusted": False,
                     "start_offset_ms": 0,
                     "end_offset_ms": 0,
+                    "detected_range": None,
                     "detected_start": None,
                     "detected_end": None,
                 }
@@ -404,9 +388,17 @@ class HitReviewTab(ttk.Frame):
     def _parse_times_file(self, path: Path) -> list[dict]:
         hits: list[dict] = []
         for line_number, raw_line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1):
-            timestamp = raw_line.strip()
-            if not timestamp:
+            parsed_ref = parse_times_line(raw_line)
+            if parsed_ref is None:
                 continue
+            if parsed_ref.kind == "range" and parsed_ref.time_range is not None:
+                # Altpfad: Dieser Loader arbeitet derzeit noch punktbasiert.
+                # Intervall-Times werden hier bewusst nicht stillschweigend auf
+                # einen Zeitpunkt reduziert und daher vorerst übersprungen.
+                continue
+            if parsed_ref.kind != "point" or parsed_ref.point is None:
+                continue
+            timestamp = format_time_point(parsed_ref.point)
             hits.append(
                 {
                     "timestamp": timestamp,
@@ -421,6 +413,7 @@ class HitReviewTab(ttk.Frame):
                     "adjusted": False,
                     "start_offset_ms": 0,
                     "end_offset_ms": 0,
+                    "detected_range": None,
                     "detected_start": None,
                     "detected_end": None,
                 }
@@ -434,33 +427,37 @@ class HitReviewTab(ttk.Frame):
             for hit in self.hits:
                 hit["begin_ts"] = hit["timestamp"]
                 hit["end_ts"] = hit["timestamp"]
-                hit["detected_start"] = _parse_timestamp(hit["timestamp"])
-                hit["detected_end"] = _parse_timestamp(hit["timestamp"])
+                detected_point = _parse_timestamp(hit["timestamp"])
+                detected_range = None if detected_point is None else TimeRange(detected_point, detected_point)
+                hit["detected_range"] = detected_range
+                hit["detected_start"] = None if detected_range is None else detected_range.start_seconds
+                hit["detected_end"] = None if detected_range is None else detected_range.end_seconds
             return
         words = self._load_words_entries(words_json)
         for hit in self.hits:
-            start, end = self._match_hit_span(hit, words)
-            if start is None or end is None:
+            detected_range = self._match_hit_span(hit, words)
+            if detected_range is None:
                 ts = _parse_timestamp(hit["timestamp"])
-                start = end = ts
-            hit["detected_start"] = start
-            hit["detected_end"] = end
-            if start is not None:
-                hit["begin_ts"] = _format_timestamp(start)
-                hit["end_ts"] = _format_timestamp(end if end is not None else start)
+                detected_range = None if ts is None else TimeRange(ts, ts)
+            hit["detected_range"] = detected_range
+            hit["detected_start"] = None if detected_range is None else detected_range.start_seconds
+            hit["detected_end"] = None if detected_range is None else detected_range.end_seconds
+            if detected_range is not None:
+                hit["begin_ts"] = _format_timestamp(detected_range.start_seconds)
+                hit["end_ts"] = _format_timestamp(detected_range.end_seconds)
             else:
                 hit["begin_ts"] = hit["timestamp"]
                 hit["end_ts"] = hit["timestamp"]
 
-    def _match_hit_span(self, hit: dict, words: list[dict]) -> tuple[float | None, float | None]:
+    def _match_hit_span(self, hit: dict, words: list[dict]) -> TimeRange | None:
         ts = _parse_timestamp(hit.get("timestamp", ""))
         tokens = _tokenize_label(hit.get("label", ""))
         if ts is None or not tokens or not words:
-            return None, None
+            return None
 
         candidates = [i for i, w in enumerate(words) if abs(float(w["start"]) - ts) <= MATCH_WINDOW_SECONDS]
         if not candidates:
-            return None, None
+            return None
 
         best = None
         for i in candidates:
@@ -499,8 +496,8 @@ class HitReviewTab(ttk.Frame):
                 best = cand
 
         if best is None:
-            return None, None
-        return best[1], best[2]
+            return None
+        return TimeRange(best[1], best[2])
 
     def _load_hits_from_selected_source(self):
         self.hit_tree.delete(*self.hit_tree.get_children())
@@ -778,10 +775,16 @@ class HitReviewTab(ttk.Frame):
             self.bleep_summary_var.set("Bleepfenster: -")
             return
         try:
+            detected_range = hit.get("detected_range")
             meta = self._compute_preview_window(hit)
+            base_start = meta["base_start"]
+            base_end = meta["base_end"]
+            if isinstance(detected_range, TimeRange):
+                base_start = detected_range.start_seconds
+                base_end = detected_range.end_seconds
             self.bleep_summary_var.set(
                 "Erkannte Wortspanne: "
-                f"{_format_timestamp(meta['base_start'])} bis {_format_timestamp(meta['base_end'])} | "
+                f"{_format_timestamp(base_start)} bis {_format_timestamp(base_end)} | "
                 "Bleepfenster: "
                 f"{_format_timestamp(meta['bleep_start'])} bis {_format_timestamp(meta['bleep_end'])} "
                 f"(Dauer {_format_timestamp(meta['bleep_end'] - meta['bleep_start'])})"

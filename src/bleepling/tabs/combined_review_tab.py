@@ -2,8 +2,176 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 from pathlib import Path
+from bleepling.services.time_service import parse_time_point
 from bleepling.tabs.bleeping_tab import _safe_read_lines, _safe_write_lines
 from bleepling.tabs.hit_review_tab import HitReviewTab, _list_files, MEDIA_EXTS, VIDEO_EXTS, _format_timestamp
+from bleepling.utils.help_dialog import show_help_dialog
+
+
+def _write_range_times_lines(path: Path, lines):
+    _safe_write_lines(path, lines)
+
+
+class _BleepingTabBridge:
+    def __init__(self, owner: "CombinedReviewTab"):
+        self.owner = owner
+
+    def tab(self):
+        return getattr(self.owner.app, "bleeping_tab", None)
+
+    def sync_to_tab(self):
+        bt = self.tab()
+        if bt is None:
+            return None
+        bt.video_var.set(self.owner.video_var.get())
+        bt.wav_var.set(self.owner.wav_var.get())
+        bt.json_var.set(self.owner.json_var.get())
+        bt.candidate_var.set(self.owner.candidate_var.get())
+        bt.block_thr.set(int(self.owner.block_thr.get()))
+        bt.allow_thr.set(int(self.owner.allow_thr.get()))
+        bt.participant_surnames_only.set(bool(self.owner.participant_surnames_only.get()))
+        bt.participant_include_firstnames.set(bool(self.owner.participant_include_firstnames.get()))
+        bt.block_text.delete("1.0", "end")
+        bt.block_text.insert("1.0", self.owner.block_text.get("1.0", "end"))
+        bt.allow_text.delete("1.0", "end")
+        bt.allow_text.insert("1.0", self.owner.allow_text.get("1.0", "end"))
+        return bt
+
+    def sync_from_tab(self):
+        bt = self.tab()
+        if bt is None:
+            return None
+        self.owner.video_var.set(bt.video_var.get())
+        self.owner.wav_var.set(bt.wav_var.get())
+        self.owner.json_var.set(bt.json_var.get())
+        self.owner.candidate_var.set(bt.candidate_var.get())
+        self.owner.block_thr.set(int(bt.block_thr.get()))
+        self.owner.allow_thr.set(int(bt.allow_thr.get()))
+        self.owner.participant_surnames_only.set(bool(bt.participant_surnames_only.get()))
+        self.owner.participant_include_firstnames.set(bool(bt.participant_include_firstnames.get()))
+        self.owner.block_text.delete("1.0", "end")
+        self.owner.block_text.insert("1.0", bt.block_text.get("1.0", "end"))
+        self.owner.allow_text.delete("1.0", "end")
+        self.owner.allow_text.insert("1.0", bt.allow_text.get("1.0", "end"))
+        return bt
+
+
+class _FFmpegTabBridge:
+    def __init__(self, owner: "CombinedReviewTab"):
+        self.owner = owner
+
+    def tab(self):
+        return getattr(self.owner.app, "ffmpeg_tab", None)
+
+    def push_bleep_params(self):
+        ff = self.tab()
+        if ff is None:
+            return None
+        try:
+            ff.bleep_freq_var.set(int(self.owner.bleep_freq_var.get()))
+            ff.bleep_gain_var.set(float(self.owner.bleep_gain_var.get()))
+            ff.bleep_pre_ms_var.set(int(self.owner.bleep_pre_ms_var.get()))
+            ff.bleep_post_ms_var.set(int(self.owner.bleep_post_ms_var.get()))
+        except Exception:
+            pass
+        return ff
+
+    def pull_bleep_params(self):
+        ff = self.tab()
+        if ff is None:
+            return None
+        try:
+            self.owner.bleep_freq_var.set(int(ff.bleep_freq_var.get()))
+            self.owner.bleep_gain_var.set(float(ff.bleep_gain_var.get()))
+            self.owner.bleep_pre_ms_var.set(int(ff.bleep_pre_ms_var.get()))
+            self.owner.bleep_post_ms_var.set(int(ff.bleep_post_ms_var.get()))
+        except Exception:
+            pass
+        return ff
+
+
+class _CombinedHitListHelper:
+    def __init__(self, owner: "CombinedReviewTab"):
+        self.owner = owner
+
+    def build_hits_from_preview_rows(self, rows):
+        hits = []
+        for line_number, row in enumerate(rows, start=1):
+            if len(row) < 5:
+                continue
+            ts, cand, result, rule, ctx = row
+            source_decision = str(result).strip().lower()
+            hits.append({
+                "timestamp": str(ts),
+                "begin_ts": str(ts),
+                "end_ts": str(ts),
+                "label": str(cand).strip() or "(ohne Kandidat)",
+                "source_decision": source_decision or "offen",
+                "review_status": source_decision if source_decision in {"bleepen", "prüfen", "ignorieren", "erlaubt"} else "offen",
+                "reason": str(rule).strip(),
+                "context": str(ctx).strip(),
+                "line_number": line_number,
+                "adjusted": False,
+                "start_offset_ms": 0,
+                "end_offset_ms": 0,
+                "detected_start": None,
+                "detected_end": None,
+            })
+        return hits
+
+    def selected_indices(self) -> list[int]:
+        indices: list[int] = []
+        for iid in self.owner.hit_tree.selection():
+            try:
+                indices.append(int(iid))
+            except Exception:
+                pass
+        return sorted(set(i for i in indices if 0 <= i < len(self.owner.hits)))
+
+    def visible_hit_rows(self):
+        filter_mode = self.owner.filter_var.get().strip().lower()
+        rows = []
+        for index, hit in enumerate(self.owner.hits):
+            status = str(hit.get("review_status", "")).strip().lower()
+            if filter_mode == "nur offene":
+                show = status in {"offen", "prüfen"}
+            else:
+                show = status in {"offen", "prüfen", "bleepen", "übernommen"}
+            if not show:
+                continue
+            rows.append((
+                str(index),
+                (
+                    hit.get("line_number", index + 1),
+                    hit["begin_ts"],
+                    hit["end_ts"],
+                    hit["label"],
+                    hit["review_status"],
+                    hit.get("reason", "") or hit["source_decision"],
+                ),
+            ))
+        return rows
+
+    def rebuild_tree(self) -> int:
+        self.owner.hit_tree.delete(*self.owner.hit_tree.get_children())
+        visible_rows = self.visible_hit_rows()
+        first_visible_iid = None
+        for iid, values in visible_rows:
+            self.owner.hit_tree.insert("", "end", iid=iid, values=values)
+            if first_visible_iid is None:
+                first_visible_iid = iid
+        if self.owner.active_hit_index is not None and str(self.owner.active_hit_index) in self.owner.hit_tree.get_children():
+            self.owner.hit_tree.selection_set(str(self.owner.active_hit_index))
+            self.owner._activate_hit(self.owner.active_hit_index)
+        elif first_visible_iid is not None:
+            self.owner.hit_tree.selection_set(first_visible_iid)
+            self.owner._activate_hit(int(first_visible_iid))
+        else:
+            self.owner.active_hit_index = None
+            self.owner._set_info_text("—", "—", "—", "—", "—", "-", "Keine Treffer für die aktuelle Filterung sichtbar.")
+        return len(visible_rows)
+
+
 class CombinedReviewTab(HitReviewTab):
     """Erste echte Vergleichs-/Testfläche für den verschmolzenen Prüfworkflow.
     Bestehende Reiter bleiben unverändert. Dieser Reiter delegiert die Vorbereitung
@@ -364,76 +532,73 @@ class CombinedReviewTab(HitReviewTab):
 
     def _project(self):
         return getattr(self.app, "project", None)
+
+    def _bleeping_bridge(self):
+        bridge = getattr(self, "_bleeping_tab_bridge", None)
+        if bridge is None:
+            bridge = _BleepingTabBridge(self)
+            self._bleeping_tab_bridge = bridge
+        return bridge
+
+    def _ffmpeg_bridge(self):
+        bridge = getattr(self, "_ffmpeg_tab_bridge", None)
+        if bridge is None:
+            bridge = _FFmpegTabBridge(self)
+            self._ffmpeg_tab_bridge = bridge
+        return bridge
+
+    def _hit_list_helper(self):
+        helper = getattr(self, "_combined_hit_list_helper", None)
+        if helper is None:
+            helper = _CombinedHitListHelper(self)
+            self._combined_hit_list_helper = helper
+        return helper
+
     def _bleeping(self):
-        return getattr(self.app, "bleeping_tab", None)
+        return self._bleeping_bridge().tab()
+
     def _show_info(self, title: str, text: str):
-        win = tk.Toplevel(self)
-        win.title(title)
-        win.transient(self.winfo_toplevel())
-        frame = ttk.Frame(win, padding=12)
-        frame.pack(fill="both", expand=True)
-        box = tk.Text(frame, height=10, width=90, wrap="word")
-        box.pack(fill="both", expand=True)
-        box.insert("1.0", text)
-        box.config(state="disabled")
-        ttk.Button(frame, text="Schließen", command=win.destroy, style="Accent.TButton").pack(anchor="e", pady=(8, 0))
+        show_help_dialog(self, title, text)
     def _sync_to_bleeping(self):
-        bt = self._bleeping()
-        if bt is None:
-            return
-        bt.video_var.set(self.video_var.get())
-        bt.wav_var.set(self.wav_var.get())
-        bt.json_var.set(self.json_var.get())
-        bt.candidate_var.set(self.candidate_var.get())
-        bt.block_thr.set(int(self.block_thr.get()))
-        bt.allow_thr.set(int(self.allow_thr.get()))
-        bt.participant_surnames_only.set(bool(self.participant_surnames_only.get()))
-        bt.participant_include_firstnames.set(bool(self.participant_include_firstnames.get()))
-        bt.block_text.delete("1.0", "end")
-        bt.block_text.insert("1.0", self.block_text.get("1.0", "end"))
-        bt.allow_text.delete("1.0", "end")
-        bt.allow_text.insert("1.0", self.allow_text.get("1.0", "end"))
+        self._bleeping_bridge().sync_to_tab()
+
     def _sync_from_bleeping(self):
-        bt = self._bleeping()
+        self._bleeping_bridge().sync_from_tab()
+
+    def make_wav(self):
+        bt = self._bleeping_bridge().sync_to_tab()
         if bt is None:
             return
-        self.video_var.set(bt.video_var.get())
-        self.wav_var.set(bt.wav_var.get())
-        self.json_var.set(bt.json_var.get())
-        self.candidate_var.set(bt.candidate_var.get())
-        self.block_thr.set(int(bt.block_thr.get()))
-        self.allow_thr.set(int(bt.allow_thr.get()))
-        self.participant_surnames_only.set(bool(bt.participant_surnames_only.get()))
-        self.participant_include_firstnames.set(bool(bt.participant_include_firstnames.get()))
-        self.block_text.delete("1.0", "end")
-        self.block_text.insert("1.0", bt.block_text.get("1.0", "end"))
-        self.allow_text.delete("1.0", "end")
-        self.allow_text.insert("1.0", bt.allow_text.get("1.0", "end"))
-    def make_wav(self):
-        bt = self._bleeping()
-        self._sync_to_bleeping()
         bt.make_wav()
         self.refresh()
+
     def make_words_json_stub(self):
-        bt = self._bleeping()
-        self._sync_to_bleeping()
+        bt = self._bleeping_bridge().sync_to_tab()
+        if bt is None:
+            return
         bt.make_words_json_stub()
         self.refresh()
+
     def make_candidates(self):
-        bt = self._bleeping()
-        self._sync_to_bleeping()
+        bt = self._bleeping_bridge().sync_to_tab()
+        if bt is None:
+            return
         bt.make_candidates()
         self.refresh()
+
     def import_participant_list(self):
-        bt = self._bleeping()
-        self._sync_to_bleeping()
+        bt = self._bleeping_bridge().sync_to_tab()
+        if bt is None:
+            return
         bt.import_participant_list()
         self.refresh()
+
     def fill_blocklist_from_candidates(self):
-        bt = self._bleeping()
-        self._sync_to_bleeping()
+        bt = self._bleeping_bridge().sync_to_tab()
+        if bt is None:
+            return
         bt.fill_blocklist_from_candidates()
-        self._sync_from_bleeping()
+        self._bleeping_bridge().sync_from_tab()
         self._set_status("Blocklist aus Kandidaten-Datei übernommen.")
 
     def clear_blocklist(self):
@@ -469,27 +634,11 @@ class CombinedReviewTab(HitReviewTab):
         self._set_status("Bleep-Parameter übernommen.")
 
     def _sync_bleep_params(self, *_):
-        ff = getattr(self.app, "ffmpeg_tab", None)
-        if ff is not None:
-            try:
-                ff.bleep_freq_var.set(int(self.bleep_freq_var.get()))
-                ff.bleep_gain_var.set(float(self.bleep_gain_var.get()))
-                ff.bleep_pre_ms_var.set(int(self.bleep_pre_ms_var.get()))
-                ff.bleep_post_ms_var.set(int(self.bleep_post_ms_var.get()))
-            except Exception:
-                pass
+        self._ffmpeg_bridge().push_bleep_params()
         self._invalidate_preview()
 
     def _pull_bleep_params_from_ffmpeg(self):
-        ff = getattr(self.app, "ffmpeg_tab", None)
-        if ff is not None:
-            try:
-                self.bleep_freq_var.set(int(ff.bleep_freq_var.get()))
-                self.bleep_gain_var.set(float(ff.bleep_gain_var.get()))
-                self.bleep_pre_ms_var.set(int(ff.bleep_pre_ms_var.get()))
-                self.bleep_post_ms_var.set(int(ff.bleep_post_ms_var.get()))
-            except Exception:
-                pass
+        self._ffmpeg_bridge().pull_bleep_params()
         if int(self.bleep_pre_ms_var.get()) == 600:
             self.bleep_pre_ms_var.set(100)
         if int(self.bleep_post_ms_var.get()) in {200, 1000}:
@@ -569,30 +718,31 @@ class CombinedReviewTab(HitReviewTab):
         }
 
     def _parse_timestamp_fallback(self, value: str):
-        try:
-            from bleepling.tabs.hit_review_tab import _parse_timestamp
-            return _parse_timestamp(value)
-        except Exception:
-            return None
+        point = parse_time_point(value)
+        return None if point is None else point.seconds
 
     def save_lists(self):
-        bt = self._bleeping()
-        self._sync_to_bleeping()
+        bt = self._bleeping_bridge().sync_to_tab()
+        if bt is None:
+            return
         bt.save_lists()
         self._set_status("Projektlisten gespeichert.")
+
     def choose_candidate(self):
-        bt = self._bleeping()
-        self._sync_to_bleeping()
+        bt = self._bleeping_bridge().sync_to_tab()
+        if bt is None:
+            return
         bt.choose_candidate()
-        self._sync_from_bleeping()
+        self._bleeping_bridge().sync_from_tab()
         self.refresh()
+
     def refresh(self):
         p = self._project()
-        bt = self._bleeping()
+        bt = self._bleeping_bridge().tab()
         if p is None or bt is None:
             return
         bt.refresh()
-        self._sync_from_bleeping()
+        self._bleeping_bridge().sync_from_tab()
         self.video_combo["values"] = _list_files(p.input_video_dir, VIDEO_EXTS)
         self.wav_combo["values"] = _list_files(p.transcription_wav_dir, {".wav"})
         self.json_combo["values"] = _list_files(p.transcription_json_dir, {".json"})
@@ -606,54 +756,9 @@ class CombinedReviewTab(HitReviewTab):
             self.media_var.set(default_medium)
         self._pull_bleep_params_from_ffmpeg()
     def _build_hits_from_preview_rows(self, rows):
-        hits = []
-        for line_number, row in enumerate(rows, start=1):
-            if len(row) < 5:
-                continue
-            ts, cand, result, rule, ctx = row
-            source_decision = str(result).strip().lower()
-            hits.append({
-                "timestamp": str(ts),
-                "begin_ts": str(ts),
-                "end_ts": str(ts),
-                "label": str(cand).strip() or "(ohne Kandidat)",
-                "source_decision": source_decision or "offen",
-                "review_status": source_decision if source_decision in {"bleepen", "prüfen", "ignorieren", "erlaubt"} else "offen",
-                "reason": str(rule).strip(),
-                "context": str(ctx).strip(),
-                "line_number": line_number,
-                "adjusted": False,
-                "start_offset_ms": 0,
-                "end_offset_ms": 0,
-                "detected_start": None,
-                "detected_end": None,
-            })
-        return hits
-    def _rebuild_tree(self):
-        self.hit_tree.delete(*self.hit_tree.get_children())
-        filter_mode = self.filter_var.get().strip().lower()
-        visible = 0
-        for index, hit in enumerate(self.hits):
-            status = hit["review_status"]
-            if filter_mode == "nur offene" and status not in {"offen", "prüfen", "bleepen"}:
-                continue
-            self.hit_tree.insert("", "end", iid=str(index), values=(
-                hit.get("line_number", index + 1),
-                hit["begin_ts"],
-                hit["end_ts"],
-                hit["label"],
-                hit["review_status"],
-                hit.get("reason", "") or hit["source_decision"],
-            ))
-            visible += 1
-        if self.hit_tree.get_children():
-            first = self.hit_tree.get_children()[0]
-            self.hit_tree.selection_set(first)
-            self._activate_hit(int(first))
-        else:
-            self.active_hit_index = None
-            self._set_info_text("—", "—", "—", "—", "—", "-", "Keine Treffer für die aktuelle Filterung sichtbar.")
-        return visible
+        return self._hit_list_helper().build_hits_from_preview_rows(rows)
+    # Archiviert: frühere _rebuild_tree-Variante war weiter unten in derselben
+    # Klasse vollständig überschrieben und wurde daher nie ausgeführt.
     def _refresh_hit_row(self, index: int):
         if 0 <= index < len(self.hits):
             hit = self.hits[index]
@@ -661,8 +766,9 @@ class CombinedReviewTab(HitReviewTab):
             if iid in self.hit_tree.get_children():
                 self.hit_tree.item(iid, values=(hit.get("line_number", index + 1), hit["begin_ts"], hit["end_ts"], hit["label"], hit["review_status"], hit.get("reason", "") or hit["source_decision"]))
     def evaluate_into_review(self):
-        bt = self._bleeping()
-        self._sync_to_bleeping()
+        bt = self._bleeping_bridge().sync_to_tab()
+        if bt is None:
+            return
         self.save_lists()
         bt.evaluate()
         rows = bt._current_preview_rows()
@@ -745,9 +851,10 @@ class CombinedReviewTab(HitReviewTab):
             if str(hit['review_status']).strip().lower() in {'bleepen', 'übernommen'}:
                 times_lines.append(f"{hit['begin_ts']} --> {hit['end_ts']}")
         _safe_write_lines(reviewed_path, reviewed_lines)
-        _safe_write_lines(times_path, times_lines)
+        _write_range_times_lines(times_path, times_lines)
         self._set_status(f"Prüfstand gespeichert: {reviewed_path.name} | Times: {times_path.name}")
-    def write_times_only(self):
+
+    def write_range_times_only(self):
         self._sync_bleep_params()
         self._recompute_all_hit_windows()
         p = self._project()
@@ -757,8 +864,14 @@ class CombinedReviewTab(HitReviewTab):
         stem = Path(self.candidate_var.get()).stem
         times_path = p.times_dir / f"{stem}.times.txt"
         times_lines = [f"{hit['begin_ts']} --> {hit['end_ts']}" for hit in self.hits if str(hit['review_status']).strip().lower() in {'bleepen', 'übernommen'}]
-        _safe_write_lines(times_path, times_lines)
+        _write_range_times_lines(times_path, times_lines)
         self._set_status(f"Times-Datei mit Intervallen aktualisiert: {times_path.name}")
+
+    def write_times_only(self):
+        # Transitional compatibility wrapper: this review path still writes
+        # range-based .times.txt files for the merged review workflow.
+        self.write_range_times_only()
+
     def _load_preview_file(self, path: Path, kind: str, meta: dict[str, float], autoplay_from_ms: int | None = None):
         try:
             self.player.load(path)
@@ -770,54 +883,16 @@ class CombinedReviewTab(HitReviewTab):
         except Exception as exc:
             self._set_status(f"Preview konnte nicht geladen werden: {exc}")
     def quick(self):
-        bt = self._bleeping()
-        self._sync_to_bleeping()
+        bt = self._bleeping_bridge().sync_to_tab()
+        if bt is None:
+            return
         bt.quick()
         self._set_status("Schnell-Nachbleepen vorbereitet.")
     def _selected_indices(self) -> list[int]:
-        indices: list[int] = []
-        for iid in self.hit_tree.selection():
-            try:
-                indices.append(int(iid))
-            except Exception:
-                pass
-        return sorted(set(i for i in indices if 0 <= i < len(self.hits)))
+        return self._hit_list_helper().selected_indices()
+
     def _rebuild_tree(self):
-        self.hit_tree.delete(*self.hit_tree.get_children())
-        filter_mode = self.filter_var.get().strip().lower()
-        visible = 0
-        first_visible_iid = None
-        for index, hit in enumerate(self.hits):
-            status = str(hit.get("review_status", "")).strip().lower()
-            show = True
-            if filter_mode == "nur offene":
-                show = status in {"offen", "prüfen"}
-            else:
-                show = status in {"offen", "prüfen", "bleepen", "übernommen"}
-            if not show:
-                continue
-            iid = str(index)
-            self.hit_tree.insert("", "end", iid=iid, values=(
-                hit.get("line_number", index + 1),
-                hit["begin_ts"],
-                hit["end_ts"],
-                hit["label"],
-                hit["review_status"],
-                hit.get("reason", "") or hit["source_decision"],
-            ))
-            if first_visible_iid is None:
-                first_visible_iid = iid
-            visible += 1
-        if self.active_hit_index is not None and str(self.active_hit_index) in self.hit_tree.get_children():
-            self.hit_tree.selection_set(str(self.active_hit_index))
-            self._activate_hit(self.active_hit_index)
-        elif first_visible_iid is not None:
-            self.hit_tree.selection_set(first_visible_iid)
-            self._activate_hit(int(first_visible_iid))
-        else:
-            self.active_hit_index = None
-            self._set_info_text("—", "—", "—", "—", "—", "-", "Keine Treffer für die aktuelle Filterung sichtbar.")
-        return visible
+        return self._hit_list_helper().rebuild_tree()
     def _set_active_status(self, new_status: str):
         indices = self._selected_indices()
         if not indices and self.active_hit_index is not None:

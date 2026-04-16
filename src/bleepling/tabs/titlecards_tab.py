@@ -42,6 +42,8 @@ PREFERRED_FONTS = [
     "Cambria",
 ]
 
+TITLE_LINE_SPACING_FACTOR = 0.28
+
 
 def sanitize_filename(text: str) -> str:
     cleaned = re.sub(r"\s+", " ", text.strip())
@@ -109,16 +111,28 @@ def resolve_font_file(font_family: str, file_index: dict[str, list[Path]], bold:
     if not candidates:
         return None
 
+    def _is_bold_style(stem: str) -> bool:
+        return any(x in stem for x in ["bold", "semibold", "demi"]) or stem.endswith(("bd", "b"))
+
+    def _is_italic_style(stem: str) -> bool:
+        return any(x in stem for x in ["italic", "oblique", "kursiv"]) or stem.endswith(("it", "i"))
+
     def score(path: Path):
         stem = normalize_name(path.stem)
         s = 0
         if normalized in stem:
             s += 10
-        if bold and any(x in stem for x in ["bold", "bd", "semibold", "demi"]):
-            s += 4
-        if italic and any(x in stem for x in ["italic", "it", "oblique"]):
-            s += 4
-        if not bold and not italic and not any(x in stem for x in ["bold", "bd", "italic", "it", "oblique"]):
+        stem_is_bold = _is_bold_style(stem)
+        stem_is_italic = _is_italic_style(stem)
+        if bold:
+            s += 8 if stem_is_bold else -4
+        elif stem_is_bold:
+            s -= 3
+        if italic:
+            s += 8 if stem_is_italic else -4
+        elif stem_is_italic:
+            s -= 3
+        if not bold and not italic and not stem_is_bold and not stem_is_italic:
             s += 5
         return s
 
@@ -139,22 +153,68 @@ def load_font(font_family: str, size: int, file_index: dict[str, list[Path]], bo
             return ImageFont.load_default()
 
 
+def draw_text_with_style(
+    base_image: Image.Image,
+    position: tuple[float, float],
+    text: str,
+    font,
+    fill: str,
+    italic: bool = False,
+):
+    x, y = position
+    if not italic:
+        ImageDraw.Draw(base_image).text((x, y), text, fill=fill, font=font)
+        return
+
+    probe = ImageDraw.Draw(Image.new("RGBA", (1, 1), (0, 0, 0, 0)))
+    bbox = probe.textbbox((0, 0), text, font=font)
+    width = max(1, bbox[2] - bbox[0])
+    height = max(1, bbox[3] - bbox[1])
+    shear = 0.22
+    pad = max(4, round(height * shear) + 6)
+    layer = Image.new("RGBA", (width + pad * 2, height + pad * 2), (0, 0, 0, 0))
+    layer_draw = ImageDraw.Draw(layer)
+    layer_draw.text((pad - bbox[0], pad - bbox[1]), text, fill=fill, font=font)
+    sheared = layer.transform(
+        (layer.width + round(layer.height * shear), layer.height),
+        Image.AFFINE,
+        (1, shear, 0, 0, 1, 0),
+        resample=Image.BICUBIC,
+    )
+    base_image.alpha_composite(
+        sheared,
+        (
+            int(round(x + bbox[0] - pad)),
+            int(round(y + bbox[1] - pad)),
+        ),
+    )
+
+
 def wrap_text(draw: ImageDraw.ImageDraw, text: str, font, max_width: int):
-    words = text.split()
-    if not words:
+    if not text:
+        return [""]
+    paragraphs = text.splitlines()
+    if not paragraphs:
         return [""]
     lines: list[str] = []
-    current = words[0]
-    for word in words[1:]:
-        candidate = current + " " + word
-        bbox = draw.textbbox((0, 0), candidate, font=font)
-        width = bbox[2] - bbox[0]
-        if width <= max_width:
-            current = candidate
-        else:
-            lines.append(current)
-            current = word
-    lines.append(current)
+    for paragraph in paragraphs:
+        words = paragraph.split()
+        if not words:
+            lines.append("")
+            continue
+        current = words[0]
+        for word in words[1:]:
+            candidate = current + " " + word
+            bbox = draw.textbbox((0, 0), candidate, font=font)
+            width = bbox[2] - bbox[0]
+            if width <= max_width:
+                current = candidate
+            else:
+                lines.append(current)
+                current = word
+        lines.append(current)
+    if not lines:
+        return [""]
     return lines
 
 
@@ -167,14 +227,16 @@ def fit_text_block(
     min_size: int,
     max_width: int,
     max_height: int,
-    max_lines: int,
+    max_lines: int | None,
     bold: bool,
     italic: bool,
 ):
     for size in range(start_size, min_size - 1, -2):
-        font = load_font(font_family, size, file_index, bold=bold, italic=italic)
+        # Kursiv wird in diesem Reiter bewusst über die sichtbare Schrägstellung
+        # beim Zeichnen erzeugt, nicht über wechselnde System-Fontvarianten.
+        font = load_font(font_family, size, file_index, bold=bold, italic=False)
         lines = wrap_text(draw, text, font, max_width)
-        if len(lines) > max_lines:
+        if max_lines is not None and len(lines) > max_lines:
             continue
         line_heights = []
         max_line_width = 0
@@ -182,11 +244,13 @@ def fit_text_block(
             bbox = draw.textbbox((0, 0), line, font=font)
             max_line_width = max(max_line_width, bbox[2] - bbox[0])
             line_heights.append(bbox[3] - bbox[1])
-        total_height = sum(line_heights) + max(0, len(lines) - 1) * round(size * 0.18)
+        total_height = sum(line_heights) + max(0, len(lines) - 1) * round(size * TITLE_LINE_SPACING_FACTOR)
         if max_line_width <= max_width and total_height <= max_height:
             return font, lines, size
-    font = load_font(font_family, min_size, file_index, bold=bold, italic=italic)
-    lines = wrap_text(draw, text, font, max_width)[:max_lines]
+    font = load_font(font_family, min_size, file_index, bold=bold, italic=False)
+    lines = wrap_text(draw, text, font, max_width)
+    if max_lines is not None:
+        lines = lines[:max_lines]
     return font, lines, min_size
 
 
@@ -194,6 +258,7 @@ class TitleCardsTab(ttk.Frame):
     def __init__(self, master, app):
         super().__init__(master)
         self.app = app
+        self._suspend_preview_updates = False
         self.background_image = None
         self.background_image_path = ""
         self.left_logo = None
@@ -206,22 +271,30 @@ class TitleCardsTab(ttk.Frame):
         default_font = "Arial" if "Arial" in self.font_names else (self.font_names[0] if self.font_names else "TkDefaultFont")
 
         self.reihe_var = tk.StringVar(value="")
+        self.subtitle_var = tk.StringVar(value="")
         self.use_background_var = tk.BooleanVar(value=False)
         self.show_footer_var = tk.BooleanVar(value=True)
         self.show_title_box_var = tk.BooleanVar(value=True)
 
         self.title_size_var = tk.IntVar(value=64)
         self.header_size_var = tk.IntVar(value=42)
+        self.subtitle_size_var = tk.IntVar(value=52)
         self.header_y_var = tk.IntVar(value=130)
+        self.subtitle_y_var = tk.IntVar(value=220)
         self.title_box_y_var = tk.IntVar(value=360)
         self.title_box_width_var = tk.IntVar(value=1140)
         self.title_box_height_var = tk.IntVar(value=320)
 
         self.title_color_var = tk.StringVar(value="Weiß")
         self.header_color_var = tk.StringVar(value="Rot")
+        self.subtitle_color_var = tk.StringVar(value="Rot")
         self.box_color_var = tk.StringVar(value="Rot")
         self.align_var = tk.StringVar(value="Zentriert")
         self.font_var = tk.StringVar(value=default_font)
+        self.header_bold_var = tk.BooleanVar(value=False)
+        self.header_italic_var = tk.BooleanVar(value=False)
+        self.subtitle_bold_var = tk.BooleanVar(value=True)
+        self.subtitle_italic_var = tk.BooleanVar(value=False)
         self.bold_var = tk.BooleanVar(value=False)
         self.italic_var = tk.BooleanVar(value=False)
         self.export_name_var = tk.StringVar(value="titelkarte.png")
@@ -230,6 +303,11 @@ class TitleCardsTab(ttk.Frame):
         self._build_ui()
         self._bind_events()
         self.reset_demo(initial=True)
+
+    def _request_preview_update(self):
+        if self._suspend_preview_updates:
+            return
+        self.update_preview()
 
     def _build_ui(self):
         self.columnconfigure(0, weight=0)
@@ -243,7 +321,7 @@ class TitleCardsTab(ttk.Frame):
         right_wrap.rowconfigure(1, weight=1)
         right_wrap.columnconfigure(0, weight=1)
 
-        self.ctrl_canvas = tk.Canvas(left_wrap, width=430, highlightthickness=0)
+        self.ctrl_canvas = tk.Canvas(left_wrap, width=560, highlightthickness=0)
         self.ctrl_scroll = ttk.Scrollbar(left_wrap, orient="vertical", command=self.ctrl_canvas.yview)
         self.ctrl_inner = ttk.Frame(self.ctrl_canvas)
 
@@ -254,86 +332,119 @@ class TitleCardsTab(ttk.Frame):
         self.ctrl_canvas.pack(side="left", fill="y", expand=False)
         self.ctrl_scroll.pack(side="right", fill="y")
 
-        ttk.Label(self.ctrl_inner, text="Titelkarten", font=("Segoe UI", 15, "bold")).pack(anchor="w", pady=(0, 10))
+        ttk.Label(self.ctrl_inner, text="Titelkarten", font=("Segoe UI", 15, "bold")).pack(anchor="w", pady=(0, 6))
 
         self._add_file_section("Grundlayout", "Ganzflächiges Hintergrundbild", self.choose_background, self.clear_background)
         ttk.Checkbutton(self.ctrl_inner, text="Hintergrundbild als Grundlayout verwenden", variable=self.use_background_var, command=self.update_preview).pack(anchor="w", pady=(2, 2))
-        ttk.Checkbutton(self.ctrl_inner, text="Generierte Logos unten zusätzlich anzeigen", variable=self.show_footer_var, command=self.update_preview).pack(anchor="w", pady=(0, 12))
+        ttk.Checkbutton(self.ctrl_inner, text="Generierte Logos unten zusätzlich anzeigen", variable=self.show_footer_var, command=self.update_preview).pack(anchor="w", pady=(0, 8))
 
         self._add_entry("Reihe / Dachzeile", self.reihe_var)
+        header_style_row = ttk.Frame(self.ctrl_inner)
+        header_style_row.pack(fill="x", pady=(4, 0))
+        ttk.Checkbutton(header_style_row, text="Fett Dachzeile", variable=self.header_bold_var, command=self.update_preview).pack(side="left")
+        ttk.Checkbutton(header_style_row, text="Kursiv Dachzeile", variable=self.header_italic_var, command=self.update_preview).pack(side="left", padx=(16, 0))
 
-        ttk.Label(self.ctrl_inner, text="Titel", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(10, 2))
-        self.title_text = tk.Text(self.ctrl_inner, width=44, height=5, wrap="word")
+        self._add_entry("Zweite Dachzeile / Untertitel", self.subtitle_var)
+        subtitle_style_row = ttk.Frame(self.ctrl_inner)
+        subtitle_style_row.pack(fill="x", pady=(4, 0))
+        ttk.Checkbutton(subtitle_style_row, text="Fett 2. Dachzeile", variable=self.subtitle_bold_var, command=self.update_preview).pack(side="left")
+        ttk.Checkbutton(subtitle_style_row, text="Kursiv 2. Dachzeile", variable=self.subtitle_italic_var, command=self.update_preview).pack(side="left", padx=(16, 0))
+
+        ttk.Label(self.ctrl_inner, text="Titel", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(8, 2))
+        self.title_text = tk.Text(self.ctrl_inner, width=44, height=4, wrap="word")
         self.title_text.pack(fill="x")
         self.title_text.insert("1.0", "")
         self.title_text.bind("<KeyRelease>", lambda _e: self._sync_title_from_text())
 
         opt_row = ttk.Frame(self.ctrl_inner)
-        opt_row.pack(fill="x", pady=(10, 4))
+        opt_row.pack(fill="x", pady=(8, 4))
         ttk.Checkbutton(opt_row, text="Titelbox anzeigen", variable=self.show_title_box_var, command=self.update_preview).pack(side="left")
-        ttk.Checkbutton(opt_row, text="Fett", variable=self.bold_var, command=self.update_preview).pack(side="left", padx=(16, 0))
-        ttk.Checkbutton(opt_row, text="Kursiv", variable=self.italic_var, command=self.update_preview).pack(side="left", padx=(16, 0))
+        ttk.Checkbutton(opt_row, text="Fett Titel", variable=self.bold_var, command=self.update_preview).pack(side="left", padx=(16, 0))
+        ttk.Checkbutton(opt_row, text="Kursiv Titel", variable=self.italic_var, command=self.update_preview).pack(side="left", padx=(16, 0))
 
         grid = ttk.Frame(self.ctrl_inner)
-        grid.pack(fill="x", pady=(6, 0))
-        for i in range(2):
+        grid.pack(fill="x", pady=(4, 0))
+        for i in range(3):
             grid.columnconfigure(i, weight=1)
 
-        self._grid_spinbox(grid, 0, 0, "Schriftgröße Titel", self.title_size_var, 24, 120)
-        self._grid_spinbox(grid, 0, 1, "Schriftgröße Dachzeile", self.header_size_var, 20, 90)
-        self._grid_spinbox(grid, 1, 0, "Y-Position Dachzeile", self.header_y_var, 60, 300)
-        self._grid_spinbox(grid, 1, 1, "Y-Position Titelbox", self.title_box_y_var, 220, 620)
-        self._grid_spinbox(grid, 2, 0, "Breite Titelbox", self.title_box_width_var, 600, 1500)
-        self._grid_spinbox(grid, 2, 1, "Höhe Titelbox", self.title_box_height_var, 180, 520)
-        self._grid_combo(grid, 3, 0, "Ausrichtung Titel", self.align_var, list(ALIGNMENTS.keys()))
-        self._grid_combo(grid, 3, 1, "Schriftart", self.font_var, self.font_names)
-        self._grid_combo(grid, 4, 0, "Textfarbe Titel", self.title_color_var, list(COLORS.keys()))
-        self._grid_combo(grid, 4, 1, "Textfarbe Dachzeile", self.header_color_var, list(COLORS.keys()))
-        self._grid_combo(grid, 5, 0, "Farbe Titelbox", self.box_color_var, list(COLORS.keys()))
+        ttk.Label(grid, text="Reihe / Dachzeile", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w", padx=(0, 8), pady=(0, 2))
+        ttk.Label(grid, text="Zweite Dachzeile", font=("Segoe UI", 9, "bold")).grid(row=0, column=1, sticky="w", padx=(0, 8), pady=(0, 2))
+        ttk.Label(grid, text="Titelbox", font=("Segoe UI", 9, "bold")).grid(row=0, column=2, sticky="w", pady=(0, 2))
+
+        self._grid_stack_spinbox(grid, 1, 0, "Schriftgröße Dachzeile", self.header_size_var, 20, 90)
+        self._grid_stack_spinbox(grid, 2, 0, "Y-Position Dachzeile", self.header_y_var, 60, 420)
+        self._grid_stack_combo(grid, 3, 0, "Textfarbe Dachzeile", self.header_color_var, list(COLORS.keys()))
+        self._grid_stack_combo(grid, 4, 0, "Ausrichtung Titel", self.align_var, list(ALIGNMENTS.keys()))
+
+        self._grid_stack_spinbox(grid, 1, 1, "Schriftgröße 2. Dachzeile", self.subtitle_size_var, 16, 90)
+        self._grid_stack_spinbox(grid, 2, 1, "Y-Position 2. Dachzeile", self.subtitle_y_var, 80, 520)
+        self._grid_stack_combo(grid, 3, 1, "Textfarbe 2. Dachzeile", self.subtitle_color_var, list(COLORS.keys()))
+        self._grid_stack_combo(grid, 4, 1, "Schriftart", self.font_var, self.font_names)
+
+        self._grid_stack_spinbox(grid, 1, 2, "Schriftgröße Titel", self.title_size_var, 24, 120)
+        self._grid_stack_spinbox(grid, 2, 2, "Y-Position Titelbox", self.title_box_y_var, 220, 700)
+        self._grid_stack_spinbox(grid, 3, 2, "Breite Titelbox", self.title_box_width_var, 600, 1500)
+        self._grid_stack_spinbox(grid, 4, 2, "Höhe Titelbox", self.title_box_height_var, 180, 620)
+        self._grid_stack_combo(grid, 5, 0, "Textfarbe Titel", self.title_color_var, list(COLORS.keys()))
+        self._grid_stack_combo(grid, 5, 1, "Farbe Titelbox", self.box_color_var, list(COLORS.keys()))
 
         self._add_file_section("Logos", "Logo links unten", self.choose_left_logo, self.clear_left_logo)
         self._add_file_section(None, "Partnerlogo rechts unten", self.choose_partner_logo, self.clear_partner_logo)
 
-        ttk.Label(self.ctrl_inner, text="Export", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(12, 2))
+        ttk.Label(self.ctrl_inner, text="Export", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(8, 2))
         self._add_entry("Export-Dateiname", self.export_name_var, pady=(0, 2))
         ttk.Label(self.ctrl_inner, text="Vorschlag aus den ersten 30 Zeichen des Titels. Der Name bleibt frei editierbar.", wraplength=390, foreground="#4b5563").pack(anchor="w", pady=(0, 8))
 
         btn_row = ttk.Frame(self.ctrl_inner)
-        btn_row.pack(fill="x", pady=(4, 6))
+        btn_row.pack(fill="x", pady=(4, 4))
         ttk.Button(btn_row, text="In Projekt exportieren", command=self.export_to_project).pack(side="left")
         ttk.Button(btn_row, text="PNG exportieren unter …", command=self.export_png).pack(side="left", padx=(8, 0))
         ttk.Button(btn_row, text="Zurücksetzen", command=self.reset_demo).pack(side="left", padx=(8, 0))
 
         ttk.Label(self.ctrl_inner, textvariable=self.status_var, wraplength=390, foreground="#4b5563").pack(anchor="w", pady=(4, 8))
-        ttk.Label(self.ctrl_inner, text="Es werden die lokal verfügbaren Systemschriftarten des jeweiligen Rechners angeboten. Schriftlizenzen sind vom Anwender selbst zu prüfen.", wraplength=390, foreground="#7c2d12").pack(anchor="w", pady=(0, 10))
 
         ttk.Label(right_wrap, text="Live-Vorschau", font=("Segoe UI", 13, "bold")).grid(row=0, column=0, sticky="w", pady=(0, 8))
 
         self.preview_canvas = tk.Canvas(right_wrap, highlightthickness=0, background="#f3f4f6")
         self.preview_canvas.grid(row=1, column=0, sticky="nsew")
-        self.preview_canvas.bind("<Configure>", lambda _e: self.update_preview())
+        self.preview_canvas.bind("<Configure>", lambda _e: self._request_preview_update())
+        ttk.Label(
+            right_wrap,
+            text="Es werden die lokal verfügbaren Systemschriftarten des jeweiligen Rechners angeboten. Schriftlizenzen sind vom Anwender selbst zu prüfen.",
+            wraplength=1180,
+            foreground="#7c2d12",
+            justify="left",
+        ).grid(row=2, column=0, sticky="w", pady=(8, 0))
 
     def _bind_events(self):
-        self.reihe_var.trace_add("write", lambda *_: self.update_preview())
+        self.reihe_var.trace_add("write", lambda *_: self._request_preview_update())
+        self.subtitle_var.trace_add("write", lambda *_: self._request_preview_update())
         for var in (
             self.title_size_var,
             self.header_size_var,
+            self.subtitle_size_var,
             self.header_y_var,
+            self.subtitle_y_var,
             self.title_box_y_var,
             self.title_box_width_var,
             self.title_box_height_var,
             self.title_color_var,
             self.header_color_var,
+            self.subtitle_color_var,
             self.box_color_var,
             self.align_var,
             self.font_var,
+            self.header_bold_var,
+            self.header_italic_var,
+            self.subtitle_bold_var,
+            self.subtitle_italic_var,
             self.bold_var,
             self.italic_var,
             self.use_background_var,
             self.show_footer_var,
             self.show_title_box_var,
         ):
-            var.trace_add("write", lambda *_: self.update_preview())
+            var.trace_add("write", lambda *_: self._request_preview_update())
 
     def _add_entry(self, label, variable, pady=(8, 2)):
         ttk.Label(self.ctrl_inner, text=label).pack(anchor="w", pady=pady)
@@ -360,10 +471,22 @@ class TitleCardsTab(ttk.Frame):
         ttk.Label(box, text=label).pack(anchor="w")
         ttk.Combobox(box, textvariable=variable, values=values, state="readonly", width=28).pack(anchor="w")
 
+    def _grid_stack_spinbox(self, parent, row, col, label, variable, minval, maxval):
+        box = ttk.Frame(parent)
+        box.grid(row=row, column=col, sticky="ew", padx=(0 if col == 0 else 8, 0), pady=2)
+        ttk.Label(box, text=label).pack(anchor="w")
+        ttk.Spinbox(box, from_=minval, to=maxval, textvariable=variable, width=14).pack(anchor="w")
+
+    def _grid_stack_combo(self, parent, row, col, label, variable, values):
+        box = ttk.Frame(parent)
+        box.grid(row=row, column=col, sticky="ew", padx=(0 if col == 0 else 8, 0), pady=2)
+        ttk.Label(box, text=label).pack(anchor="w")
+        ttk.Combobox(box, textvariable=variable, values=values, state="readonly", width=18).pack(anchor="w", fill="x")
+
     def _sync_title_from_text(self):
         title_value = self.title_text.get("1.0", "end-1c").strip()
         self.export_name_var.set(sanitize_filename(title_value) if title_value else "titelkarte.png")
-        self.update_preview()
+        self._request_preview_update()
 
     def _state_path(self):
         project = getattr(self.app, "project", None)
@@ -393,8 +516,10 @@ class TitleCardsTab(ttk.Frame):
         if not path or not path.exists():
             return
         try:
+            self._suspend_preview_updates = True
             data = json.loads(path.read_text(encoding="utf-8"))
             self.reihe_var.set(data.get("reihe", ""))
+            self.subtitle_var.set(data.get("subtitle", ""))
             self.title_text.delete("1.0", "end")
             self.title_text.insert("1.0", data.get("titel", ""))
             self.use_background_var.set(bool(data.get("use_background", False)))
@@ -402,15 +527,22 @@ class TitleCardsTab(ttk.Frame):
             self.show_title_box_var.set(bool(data.get("show_title_box", True)))
             self.title_size_var.set(int(data.get("title_size", 64)))
             self.header_size_var.set(int(data.get("header_size", 42)))
+            self.subtitle_size_var.set(int(data.get("subtitle_size", 52)))
             self.header_y_var.set(int(data.get("header_y", 130)))
+            self.subtitle_y_var.set(int(data.get("subtitle_y", 220)))
             self.title_box_y_var.set(int(data.get("title_box_y", 360)))
             self.title_box_width_var.set(int(data.get("title_box_width", 1140)))
             self.title_box_height_var.set(int(data.get("title_box_height", 320)))
             self.title_color_var.set(data.get("title_color", "Weiß"))
             self.header_color_var.set(data.get("header_color", "Rot"))
+            self.subtitle_color_var.set(data.get("subtitle_color", "Rot"))
             self.box_color_var.set(data.get("box_color", "Rot"))
             self.align_var.set(data.get("align", "Zentriert"))
             self.font_var.set(data.get("font", self.font_var.get()))
+            self.header_bold_var.set(bool(data.get("header_bold", False)))
+            self.header_italic_var.set(bool(data.get("header_italic", False)))
+            self.subtitle_bold_var.set(bool(data.get("subtitle_bold", True)))
+            self.subtitle_italic_var.set(bool(data.get("subtitle_italic", False)))
             self.bold_var.set(bool(data.get("bold", False)))
             self.italic_var.set(bool(data.get("italic", False)))
             self.background_image_path = data.get("background_image_path", "")
@@ -424,6 +556,10 @@ class TitleCardsTab(ttk.Frame):
             self.status_var.set("Titelkarten-Stand geladen.")
         except Exception as exc:
             self.status_var.set(f"Laden fehlgeschlagen: {exc}")
+        finally:
+            self._suspend_preview_updates = False
+        if self.status_var.get() == "Titelkarten-Stand geladen.":
+            self.update_preview()
 
     def save_state(self):
         path = self._state_path()
@@ -433,21 +569,29 @@ class TitleCardsTab(ttk.Frame):
             path.parent.mkdir(parents=True, exist_ok=True)
             data = {
                 "reihe": self.reihe_var.get(),
+                "subtitle": self.subtitle_var.get(),
                 "titel": self.title_text.get("1.0", "end-1c"),
                 "use_background": self.use_background_var.get(),
                 "show_footer": self.show_footer_var.get(),
                 "show_title_box": self.show_title_box_var.get(),
                 "title_size": self.title_size_var.get(),
                 "header_size": self.header_size_var.get(),
+                "subtitle_size": self.subtitle_size_var.get(),
                 "header_y": self.header_y_var.get(),
+                "subtitle_y": self.subtitle_y_var.get(),
                 "title_box_y": self.title_box_y_var.get(),
                 "title_box_width": self.title_box_width_var.get(),
                 "title_box_height": self.title_box_height_var.get(),
                 "title_color": self.title_color_var.get(),
                 "header_color": self.header_color_var.get(),
+                "subtitle_color": self.subtitle_color_var.get(),
                 "box_color": self.box_color_var.get(),
                 "align": self.align_var.get(),
                 "font": self.font_var.get(),
+                "header_bold": self.header_bold_var.get(),
+                "header_italic": self.header_italic_var.get(),
+                "subtitle_bold": self.subtitle_bold_var.get(),
+                "subtitle_italic": self.subtitle_italic_var.get(),
                 "bold": self.bold_var.get(),
                 "italic": self.italic_var.get(),
                 "background_image_path": self.background_image_path,
@@ -464,36 +608,36 @@ class TitleCardsTab(ttk.Frame):
         if path:
             self.background_image_path = path
             self.background_image = Image.open(path).convert("RGBA")
-            self.update_preview()
+            self._request_preview_update()
 
     def clear_background(self):
         self.background_image = None
         self.background_image_path = ""
-        self.update_preview()
+        self._request_preview_update()
 
     def choose_left_logo(self):
         path = filedialog.askopenfilename(filetypes=[("Bilddateien", "*.png *.jpg *.jpeg *.bmp *.webp")])
         if path:
             self.left_logo_path = path
             self.left_logo = Image.open(path).convert("RGBA")
-            self.update_preview()
+            self._request_preview_update()
 
     def clear_left_logo(self):
         self.left_logo = None
         self.left_logo_path = ""
-        self.update_preview()
+        self._request_preview_update()
 
     def choose_partner_logo(self):
         path = filedialog.askopenfilename(filetypes=[("Bilddateien", "*.png *.jpg *.jpeg *.bmp *.webp")])
         if path:
             self.partner_logo_path = path
             self.partner_logo = Image.open(path).convert("RGBA")
-            self.update_preview()
+            self._request_preview_update()
 
     def clear_partner_logo(self):
         self.partner_logo = None
         self.partner_logo_path = ""
-        self.update_preview()
+        self._request_preview_update()
 
     def _draw_neutral_slot(self, draw: ImageDraw.ImageDraw, box, label: str):
         x1, y1, x2, y2 = box
@@ -504,18 +648,26 @@ class TitleCardsTab(ttk.Frame):
         th = bbox[3] - bbox[1]
         draw.text((x1 + (x2 - x1 - tw) / 2, y1 + (y2 - y1 - th) / 2), label, fill="#94A3B8", font=slot_font)
 
+    def _draw_neutral_text_slot(self, draw: ImageDraw.ImageDraw, box, label: str):
+        x1, y1, x2, y2 = box
+        draw.rounded_rectangle(box, radius=14, outline="#D1D5DB", width=2, fill="#F9FAFB")
+        slot_font = load_font(self.font_var.get(), 20, self.font_file_index)
+        bbox = draw.textbbox((0, 0), label, font=slot_font)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
+        draw.text((x1 + (x2 - x1 - tw) / 2, y1 + (y2 - y1 - th) / 2), label, fill="#9CA3AF", font=slot_font)
+
     def render_image(self):
         img = Image.new("RGBA", (CANVAS_W, CANVAS_H), "#F3F4F6")
         draw = ImageDraw.Draw(img)
-
-        header_y = self.header_y_var.get()
-        header_height = 90
 
         title_box_w = self.title_box_width_var.get()
         title_box_h = self.title_box_height_var.get()
         title_box_x = int((CANVAS_W - title_box_w) / 2)
         title_box_y = self.title_box_y_var.get()
         title_box = (title_box_x, title_box_y, title_box_x + title_box_w, title_box_y + title_box_h)
+        header_box = (420, self.header_y_var.get() - 22, CANVAS_W - 420, self.header_y_var.get() + 44)
+        subtitle_box = (380, self.subtitle_y_var.get() - 24, CANVAS_W - 380, self.subtitle_y_var.get() + 52)
 
         title_margin_x = 60
         title_text_x = title_box_x + title_margin_x
@@ -531,15 +683,29 @@ class TitleCardsTab(ttk.Frame):
         else:
             draw.rectangle((0, 0, CANVAS_W, CANVAS_H), fill="#F3F4F6")
             draw.rounded_rectangle((70, 70, CANVAS_W - 70, CANVAS_H - 70), radius=20, outline="#E5E7EB", width=2)
-            draw.rounded_rectangle((120, header_y, CANVAS_W - 120, header_y + header_height), radius=14, outline="#E5E7EB", width=2, fill="#F9FAFB")
             if self.show_title_box_var.get():
                 draw.rounded_rectangle(title_box, radius=18, outline="#E5E7EB", width=2, fill="#FAFAFA")
 
         header_text = self.reihe_var.get().strip()
+        subtitle_text = self.subtitle_var.get().strip()
         title_text = self.title_text.get("1.0", "end-1c").strip()
 
-        header_font = load_font(self.font_var.get(), self.header_size_var.get(), self.font_file_index, bold=True)
+        header_font = load_font(
+            self.font_var.get(),
+            self.header_size_var.get(),
+            self.font_file_index,
+            bold=self.header_bold_var.get(),
+            italic=False,
+        )
+        subtitle_font = load_font(
+            self.font_var.get(),
+            self.subtitle_size_var.get(),
+            self.font_file_index,
+            bold=self.subtitle_bold_var.get(),
+            italic=False,
+        )
         header_color = COLORS[self.header_color_var.get()]
+        subtitle_color = COLORS[self.subtitle_color_var.get()]
         title_color = COLORS[self.title_color_var.get()]
         box_color = COLORS[self.box_color_var.get()]
         align = ALIGNMENTS[self.align_var.get()]
@@ -547,8 +713,32 @@ class TitleCardsTab(ttk.Frame):
         if header_text:
             header_bbox = draw.textbbox((0, 0), header_text, font=header_font)
             header_w = header_bbox[2] - header_bbox[0]
-            header_h = header_bbox[3] - header_bbox[1]
-            draw.text(((CANVAS_W - header_w) / 2, header_y + (header_height - header_h) / 2), header_text, fill=header_color, font=header_font)
+            header_x = (CANVAS_W - header_w) / 2
+            draw_text_with_style(
+                img,
+                (header_x, self.header_y_var.get() - header_bbox[1]),
+                header_text,
+                header_font,
+                header_color,
+                italic=self.header_italic_var.get(),
+            )
+        else:
+            self._draw_neutral_text_slot(draw, header_box, "Reihe / Dachzeile")
+
+        if subtitle_text:
+            subtitle_bbox = draw.textbbox((0, 0), subtitle_text, font=subtitle_font)
+            subtitle_w = subtitle_bbox[2] - subtitle_bbox[0]
+            subtitle_x = (CANVAS_W - subtitle_w) / 2
+            draw_text_with_style(
+                img,
+                (subtitle_x, self.subtitle_y_var.get() - subtitle_bbox[1]),
+                subtitle_text,
+                subtitle_font,
+                subtitle_color,
+                italic=self.subtitle_italic_var.get(),
+            )
+        else:
+            self._draw_neutral_text_slot(draw, subtitle_box, "Zweite Dachzeile / Untertitel")
 
         if self.show_title_box_var.get():
             draw.rounded_rectangle(title_box, radius=16, fill=box_color)
@@ -560,24 +750,21 @@ class TitleCardsTab(ttk.Frame):
                 font_family=self.font_var.get(),
                 file_index=self.font_file_index,
                 start_size=self.title_size_var.get(),
-                min_size=30,
+                min_size=12,
                 max_width=title_text_w,
                 max_height=title_text_h,
-                max_lines=3,
+                max_lines=None,
                 bold=self.bold_var.get(),
                 italic=self.italic_var.get(),
             )
 
-            line_spacing = round(fitted_size * 0.18)
-            line_heights = []
-            for line in title_lines:
-                bbox = draw.textbbox((0, 0), line, font=title_font)
-                line_heights.append(bbox[3] - bbox[1])
+            line_spacing = round(fitted_size * TITLE_LINE_SPACING_FACTOR)
+            line_boxes = [draw.textbbox((0, 0), line, font=title_font) for line in title_lines]
+            line_heights = [bbox[3] - bbox[1] for bbox in line_boxes]
             total_height = sum(line_heights) + max(0, len(title_lines) - 1) * line_spacing
-            y = title_text_y + (title_text_h - total_height) / 2
+            y_top = title_text_y + (title_text_h - total_height) / 2
 
-            for line, h in zip(title_lines, line_heights):
-                bbox = draw.textbbox((0, 0), line, font=title_font)
+            for line, bbox, h in zip(title_lines, line_boxes, line_heights):
                 line_w = bbox[2] - bbox[0]
                 if align == "left":
                     x = title_text_x
@@ -585,8 +772,15 @@ class TitleCardsTab(ttk.Frame):
                     x = title_text_x + title_text_w - line_w
                 else:
                     x = title_text_x + (title_text_w - line_w) / 2
-                draw.text((x, y), line, fill=title_color, font=title_font)
-                y += h + line_spacing
+                draw_text_with_style(
+                    img,
+                    (x, y_top - bbox[1]),
+                    line,
+                    title_font,
+                    title_color,
+                    italic=self.italic_var.get(),
+                )
+                y_top += h + line_spacing
 
         if self.show_footer_var.get() and not self.use_background_var.get():
             left_box = (110, 860, 870, 1010)
@@ -635,6 +829,7 @@ class TitleCardsTab(ttk.Frame):
 
     def reset_demo(self, initial: bool = False):
         self.reihe_var.set("")
+        self.subtitle_var.set("")
         self.title_text.delete("1.0", "end")
         self.background_image = None
         self.background_image_path = ""
@@ -647,14 +842,21 @@ class TitleCardsTab(ttk.Frame):
         self.show_title_box_var.set(True)
         self.title_size_var.set(64)
         self.header_size_var.set(42)
+        self.subtitle_size_var.set(52)
         self.header_y_var.set(130)
+        self.subtitle_y_var.set(220)
         self.title_box_y_var.set(360)
         self.title_box_width_var.set(1140)
         self.title_box_height_var.set(320)
         self.title_color_var.set("Weiß")
         self.header_color_var.set("Rot")
+        self.subtitle_color_var.set("Rot")
         self.box_color_var.set("Rot")
         self.align_var.set("Zentriert")
+        self.header_bold_var.set(False)
+        self.header_italic_var.set(False)
+        self.subtitle_bold_var.set(True)
+        self.subtitle_italic_var.set(False)
         if "Arial" in self.font_names:
             self.font_var.set("Arial")
         elif self.font_names:

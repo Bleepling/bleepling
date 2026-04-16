@@ -34,6 +34,8 @@ except Exception:
     Image = None
     ImageTk = None
 from bleepling.services.bleeping_service import BleepingService
+from bleepling.services.time_service import format_time_point
+from bleepling.utils.help_dialog import show_help_dialog
 
 
 def _safe_read_lines(path: Path):
@@ -46,6 +48,10 @@ def _safe_write_lines(path: Path, lines):
     path.write_text("\n".join(lines).strip() + ("\n" if lines else ""), encoding="utf-8")
 
 
+def _write_point_times_lines(path: Path, lines):
+    _safe_write_lines(path, lines)
+
+
 def _list_files(directory: Path, exts: set[str]):
     if not directory.exists():
         return []
@@ -53,14 +59,7 @@ def _list_files(directory: Path, exts: set[str]):
 
 
 def _format_ts(start: float) -> str:
-    total_ms = int(round(start * 1000))
-    h = total_ms // 3600000
-    total_ms %= 3600000
-    m = total_ms // 60000
-    total_ms %= 60000
-    s = total_ms // 1000
-    ms = total_ms % 1000
-    return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
+    return format_time_point(start, clamp_zero=False)
 
 
 TITLES = {"Herr","Frau","Dr","Doktor","Professor","Prof","Richter","Richterin","Minister","Ministerin","Staatsminister","Präsident","Präsidentin"}
@@ -445,34 +444,7 @@ class BleepingTab(ttk.Frame):
         help_text = getattr(self, attr_name, "")
         if not help_text:
             return
-
-        win = tk.Toplevel(self)
-        win.title("Hilfe")
-        win.transient(self.winfo_toplevel())
-        try:
-            win.attributes("-topmost", True)
-        except Exception:
-            pass
-        win.resizable(True, True)
-
-        frame = ttk.Frame(win, padding=14)
-        frame.pack(fill="both", expand=True)
-
-        box = tk.Text(frame, height=14, width=100, wrap="word", font=("Segoe UI", 15))
-        box.pack(fill="both", expand=True)
-        box.insert("1.0", help_text)
-        box.config(state="disabled")
-
-        ttk.Button(frame, text="Schließen", command=win.destroy, style="Accent.TButton").pack(anchor="e", pady=(12, 0))
-
-        win.update_idletasks()
-        try:
-            root = self.winfo_toplevel()
-            x = root.winfo_rootx() + max(0, (root.winfo_width() - win.winfo_width()) // 2)
-            y = root.winfo_rooty() + max(0, (root.winfo_height() - win.winfo_height()) // 2)
-            win.geometry(f"+{x}+{y}")
-        except Exception:
-            pass
+        show_help_dialog(self, "Hilfe", help_text)
 
     def _build(self):
 
@@ -965,7 +937,7 @@ class BleepingTab(ttk.Frame):
                 rows.append(tuple(vals))
         return rows
 
-    def create_times_from_preview(self):
+    def create_point_times_from_preview(self):
         if not self.app.project or not self.candidate_var.get():
             self._set_status("Bitte zuerst eine Kandidaten-Datei wählen.")
             return
@@ -983,12 +955,17 @@ class BleepingTab(ttk.Frame):
             if str(result).strip().lower() == "bleepen":
                 times_lines.append(str(ts).strip())
 
-        _safe_write_lines(times_path, times_lines)
+        _write_point_times_lines(times_path, times_lines)
         _safe_write_lines(reviewed_path, reviewed_lines)
         self._set_status(
             f"Times-Datei erzeugt: {times_path.name}\n"
             f"Bleeps: {len(times_lines)} | Reviewed-Zeilen: {len(reviewed_lines)}"
         )
+
+    def create_times_from_preview(self):
+        # Transitional compatibility wrapper: this preview path still writes
+        # point-based .times.txt files for the existing workflow.
+        self.create_point_times_from_preview()
 
     def quick(self):
         if not self.app.project or not self.candidate_var.get():

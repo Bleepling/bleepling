@@ -13,6 +13,7 @@ from typing import Iterable
 
 from bleepling.models.project import Project
 from bleepling.services.environment_service import EnvironmentService
+from bleepling.services.time_service import format_time_point, parse_time_point
 
 
 @dataclass
@@ -481,12 +482,17 @@ class BleepingService:
         output_path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
         return output_path
 
-    def write_times_file(self, project: Project, source_file: Path, decisions: list[CandidateDecision]) -> Path:
+    def write_point_times_file(self, project: Project, source_file: Path, decisions: list[CandidateDecision]) -> Path:
         output_path = project.times_dir / self._build_times_filename(source_file)
         timestamps = [item.timestamp for item in decisions if item.decision == "bleepen"]
         unique_timestamps = list(dict.fromkeys(timestamps))
         output_path.write_text("\n".join(unique_timestamps) + ("\n" if unique_timestamps else ""), encoding="utf-8")
         return output_path
+
+    def write_times_file(self, project: Project, source_file: Path, decisions: list[CandidateDecision]) -> Path:
+        # Transitional compatibility wrapper: this legacy writer still persists
+        # point-based .times.txt files for the existing bleeping workflow.
+        return self.write_point_times_file(project, source_file, decisions)
 
     def write_quick_rebleep_file(self, project: Project, source_file: Path, decisions: list[CandidateDecision]) -> Path:
         target = project.times_dir / self._build_quick_rebleep_filename(source_file)
@@ -590,11 +596,7 @@ class BleepingService:
         return self.normalize_name(word) in self.BAD_NAME_WORDS
 
     def seconds_to_ts(self, seconds: float) -> str:
-        total_ms = int(round(seconds * 1000))
-        hours, rem = divmod(total_ms, 3600000)
-        minutes, rem = divmod(rem, 60000)
-        secs, ms = divmod(rem, 1000)
-        return f"{hours:02d}:{minutes:02d}:{secs:02d}.{ms:03d}"
+        return format_time_point(seconds, clamp_zero=False)
 
     def make_context(self, words: list[dict], index: int, window: int = 10) -> str:
         left = max(0, index - window)
@@ -602,9 +604,10 @@ class BleepingService:
         return " ".join(self.clean_word(str(w.get("word", ""))) for w in words[left:right]).strip()
 
     def _ts_to_seconds(self, timestamp: str) -> float:
-        h, m, rest = timestamp.split(":")
-        s, ms = rest.split(".")
-        return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000.0
+        point = parse_time_point(timestamp)
+        if point is None:
+            raise ValueError(f"Ungültiger Zeitstempel: {timestamp}")
+        return point.seconds
 
     def _list_files(self, folder: Path, pattern: str) -> list[Path]:
         if not folder.exists():

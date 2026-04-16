@@ -4,7 +4,7 @@ Bleepling ist eine lokal laufende Open-Source-Anwendung zur Anonymisierung von A
 
 Die Anwendung unterstützt einen nachvollziehbaren Prüf-Workflow: Aus einem Video oder einer Audioquelle werden Transkriptionsdaten erzeugt, daraus Kandidaten für mögliche Namensnennungen abgeleitet, diese werden menschlich geprüft und anschließend in Form einer Times-Datei für den finalen Bleep-Export verwendet.
 
-Seit Version **1.2.1** enthält Bleepling zusätzlich den Reiter **„Titelkarten“**. Seit Version **1.3.0** kommt mit **„Schnitt & Kapitel“** ein weiterer Arbeitsbereich hinzu, mit dem aus vorhandenen Quellvideos zunächst ein Arbeitsvideo gebildet und daraus einzelne Clips für den weiteren Prüf-Workflow erzeugt werden können.
+Seit Version **1.2.1** enthält Bleepling zusätzlich den Reiter **„Titelkarten“**. Seit Version **1.3.0** kommt mit **„Schnitt & Kapitel“** ein weiterer Arbeitsbereich hinzu, mit dem aus vorhandenen Quellvideos zunächst ein Arbeitsvideo gebildet und daraus einzelne Clips für den weiteren Prüf-Workflow erzeugt werden können. Mit Version **1.4.0** wurde insbesondere der Titelkarten-Reiter deutlich ausgebaut und der Reiter **„Einstellungen / Logs“** klarer strukturiert.
 
 ## Hauptfunktionen
 
@@ -19,6 +19,7 @@ Seit Version **1.2.1** enthält Bleepling zusätzlich den Reiter **„Titelkarte
 - finaler Export gebleepter Video- oder Audiodateien über FFmpeg
 - gezielte Nachbearbeitung bereits erzeugter Medien
 - Erstellung von PNG-Titelkarten über den Reiter **„Titelkarten“**
+- zweite Dachzeile / Untertitel sowie mehrzeilige Titelkarten-Layouts mit Live-Vorschau
 - Einstellungs- und Log-Bereich für Prüfung, Installation und Fehlersuche
 
 ## Ziel des Projekts
@@ -66,7 +67,7 @@ Diese Komponenten sind **nicht Bestandteil dieses Projekts** und müssen bei Bed
 
 ## Reiter im Überblick
 
-Der Arbeitsstand **1.3.0** verwendet insbesondere diese sichtbaren Reiter:
+Der Arbeitsstand **1.4.0** verwendet insbesondere diese sichtbaren Reiter:
 
 - **Projekt** – Projekt anlegen, laden und verwalten
 - **Medien** – Video- und WAV-Dateien ins Projekt übernehmen
@@ -100,9 +101,11 @@ Der Reiter **„Titelkarten“** ist für die Erstellung statischer PNG-Karten i
 
 Unterstützt werden unter anderem:
 
-- Dachzeile und Titeltext
+- Dachzeile, zweite Dachzeile / Untertitel und Titeltext
 - farbige Titelbox mit einstellbarer Größe
-- vertikale Positionierung von Dachzeile und Titelbox
+- vertikale Positionierung von Dachzeile, zweiter Dachzeile und Titelbox
+- getrennte Farben, Schriftgrößen und Stilumschaltungen für die einzelnen Textebenen
+- mehrzeilige Titel mit automatischer Einpassung in die verfügbare Titelbox
 - Logos links unten und rechts unten
 - Hintergrundbild als Grundlayout
 - Export direkt in den Projektordner `04_output/titlecards`
@@ -121,7 +124,7 @@ Bleepling enthält einen eigenen Reiter **„Einstellungen / Logs“**. Dort kan
 - python-vlc sowie optionale VLC-/libVLC-Komponenten
 - Render-Backend und weitere technische Einstellungen
 
-Der Bereich dient außerdem dazu, Installationshinweise und Installationskommandos bereitzustellen oder deren Ausführung lokal vorzubereiten.
+Der Bereich dient außerdem dazu, Installationshinweise, sichtbare Einrichtungsbefehle und Hilfetexte für typische Diagnosefälle bereitzustellen oder deren Ausführung lokal vorzubereiten.
 
 Wichtig ist dabei: Externe Komponenten wie **FFmpeg**, **VLC/libVLC**, **CUDA** oder **cuDNN** werden durch Bleepling nicht mitgeliefert. Die Anwendung prüft nur deren Vorhandensein und unterstützt bei der Einrichtung.
 
@@ -249,7 +252,7 @@ python -m bleepling.app
 
 ## Projektstruktur
 
-Im Projektstand 1.3.0 werden unter anderem diese projektbezogenen Pfade verwendet:
+Im Projektstand 1.4.0 werden unter anderem diese projektbezogenen Pfade verwendet:
 
 - `01_input/video`
 - `03_processing/04_cutting/working_video`

@@ -8,6 +8,15 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
+from bleepling.services.render_service import (
+    build_bleep_audio_filter,
+    find_ffmpeg,
+    find_ffprobe,
+    parse_progress_line,
+    run_simple_command,
+)
+from bleepling.services.time_service import parse_times_line
+
 try:
     from PIL import Image, ImageTk
 except Exception:
@@ -76,10 +85,10 @@ class TargetedEditTab(ttk.Frame):
         return Path(__file__).resolve().parents[3] / "assets" / name
 
     def _ffmpeg(self):
-        return shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+        return find_ffmpeg()
 
     def _ffprobe(self):
-        return shutil.which("ffprobe") or shutil.which("ffprobe.exe")
+        return find_ffprobe()
 
     def _project(self):
         return getattr(self.app, "project", None)
@@ -200,12 +209,17 @@ class TargetedEditTab(ttk.Frame):
         parsed = []
         pre = int(self.pre_ms_var.get()) / 1000.0
         post = int(self.post_ms_var.get()) / 1000.0
-        for ts in lines:
-            parts = ts.split(":")
-            if len(parts) != 3:
+        for line in lines:
+            parsed_ref = parse_times_line(line)
+            if parsed_ref is None:
                 continue
-            h = int(parts[0]); m = int(parts[1]); s = float(parts[2])
-            center = h * 3600 + m * 60 + s
+            if parsed_ref.kind == "range" and parsed_ref.time_range is not None:
+                # Altpfad: Dieser Reiter arbeitet bisher faktisch point-basiert.
+                # Echte Intervalle werden hier noch nicht fachlich verarbeitet.
+                continue
+            if parsed_ref.kind != "point" or parsed_ref.point is None:
+                continue
+            center = parsed_ref.point.seconds
             start = max(0.0, center - pre)
             end = center + post
             dur = max(0.08, end - start if end > start else 0.35)
@@ -216,19 +230,7 @@ class TargetedEditTab(ttk.Frame):
         cfg = self._get_ffmpeg_bleep_settings()
         freq = cfg["freq"]
         gain = cfg["gain"]
-        items = []
-        current_label = "src0"
-        items.append(f"[0:a]anull[{current_label}]")
-        for idx, (start, end, dur) in enumerate(intervals):
-            next_label = f"src{idx+1}"
-            items.append(f"[{current_label}]volume=enable='between(t,{start:.3f},{end:.3f})':volume=0[{next_label}]")
-            current_label = next_label
-        items.append(f"[{current_label}]anull[muted]")
-        for idx, (start, end, dur) in enumerate(intervals):
-            items.append(f"sine=f={freq}:sample_rate=48000:d={dur:.3f},volume={gain},adelay={int(start*1000)}:all=1[b{idx}]")
-        amix_inputs = "[muted]" + "".join(f"[b{idx}]" for idx in range(len(intervals)))
-        items.append(f"{amix_inputs}amix=inputs={1+len(intervals)}:normalize=0[aout]")
-        return ";".join(items)
+        return build_bleep_audio_filter(intervals, freq, gain, sample_rate=48000)
 
     def _show_progress_window(self):
         if self.progress_win is not None:
@@ -316,7 +318,7 @@ class TargetedEditTab(ttk.Frame):
             self.after(150, self._poll_render_queue)
 
     def _run_simple(self, cmd):
-        return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        return run_simple_command(cmd)
 
     def _run_progress_cmd(self, cmd, duration):
         self.proc = subprocess.Popen(
@@ -334,20 +336,24 @@ class TargetedEditTab(ttk.Frame):
         if self.proc.stdout is not None:
             for raw in self.proc.stdout:
                 line = (raw or "").strip()
-                if line.startswith("out_time_ms="):
-                    out_time = _safe_float(line.split("=", 1)[1]) / 1_000_000.0
+                event = parse_progress_line(line)
+                if event is None:
+                    continue
+                event_kind, event_value = event
+                if event_kind == "out_time_seconds":
+                    out_time = float(event_value)
                     if duration > 0:
                         percent = max(percent, min(100.0, out_time / duration * 100.0))
                     self.render_queue.put({"kind": "progress", "percent": percent, "label": f"{percent:.1f} % | Medienzeit {_fmt_mmss(out_time)} | Größe {size_text} | Speed {speed_text}"})
-                elif line.startswith("total_size="):
+                elif event_kind == "total_size":
                     try:
-                        size_bytes = int(line.split("=", 1)[1])
+                        size_bytes = int(event_value)
                         size_text = f"{size_bytes / (1024*1024):.1f} MB"
                     except Exception:
                         size_text = "-"
-                elif line.startswith("speed="):
-                    speed_text = line.split("=", 1)[1].strip() or "-"
-                elif line.startswith("progress=end"):
+                elif event_kind == "speed":
+                    speed_text = str(event_value)
+                elif event_kind == "progress" and event_value == "end":
                     self.render_queue.put({"kind": "progress", "percent": 100.0, "label": f"100.0 % | Größe {size_text} | Speed {speed_text}"})
         if self.proc.stderr is not None:
             err.append(self.proc.stderr.read())

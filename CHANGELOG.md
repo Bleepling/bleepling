@@ -4,6 +4,35 @@ Alle nennenswerten Änderungen an **Bleepling** sollen in dieser Datei dokumenti
 
 Die Struktur orientiert sich an einer einfachen, für Open-Source-Projekte gut lesbaren Versionshistorie.
 
+## [1.4.0] - 2026-04-15
+
+### Hinzugefügt
+- erweiterter Reiter **„Titelkarten“** mit zusätzlicher **zweiter Dachzeile / Untertitel**
+- getrennte Gestaltungsparameter für **Dachzeile**, **zweite Dachzeile** und **Titel** einschließlich Schriftgröße, Farbe, Position sowie Fett-/Kursiv-Schaltung
+- sichtbare Platzhalter in der Live-Vorschau für leere Dachzeilen- und Logobereiche zur besseren Layout-Orientierung
+- klarere Detail- und Hilfebereiche im Reiter **„Einstellungen / Logs“** mit sichtbaren Einrichtungsbefehlen
+
+### Geändert
+- der Reiter **„Titelkarten“** verarbeitet manuelle Zeilenumbrüche im Titel jetzt direkt in Vorschau und Export
+- längere oder mehrzeilige Titel werden innerhalb der Titelbox robuster eingepasst, statt vorzeitig abgeschnitten zu werden
+- vertikale Zentrierung, Zeilenabstände und Vorschauverhalten im Titelkarten-Layout wurden sichtbar verfeinert
+- die Bedienoberfläche des Reiters **„Titelkarten“** wurde für Dachzeile, zweite Dachzeile und Titel kompakter und nachvollziehbarer angeordnet
+- der Reiter **„Einstellungen / Logs“** wurde sprachlich und visuell geglättet; Prüfdetails, Hilfetexte und Einrichtungsbefehle sind jetzt klarer getrennt
+- interne Hilfs- und Service-Strukturen für Zeitlogik, Render-Helfer und Reiterkopplungen wurden weiter bereinigt, ohne den Fachworkflow sichtbar zu ändern
+- Dokumentation, README und Release-Unterlagen auf den Stand **1.4.0** fortgeschrieben
+
+### Behoben
+- unnötig langsame Reiterwechsel durch zu breit ausgelöste Aktualisierungen beim Tab-Wechsel
+- wiederholte Vorschau-Neuberechnungen im Reiter **„Titelkarten“** beim Laden gespeicherter Zustände
+- fehlerhafte oder unvollständige Darstellung mehrzeiliger Titel in der Titelbox
+- inkonsistente Stilumschaltung bei Fett-/Kursiv-Kombinationen im Titelkarten-Layout
+- uneinheitliches Erscheinungsbild von Hilfe-Dialogen in mehreren Reitern
+
+### Hinweise
+- Die zweite Dachzeile im Reiter **„Titelkarten“** ist als regulärer zusätzlicher Textblock gedacht und kann projektspezifisch leer bleiben oder aktiv genutzt werden.
+- Für Titelkarten werden weiterhin nur lokal verfügbare Systemschriftarten verwendet; eigene Font-Dateien werden nicht mitgeliefert.
+- Die technische Diagnose im Reiter **„Einstellungen / Logs“** unterstützt weiterhin bei der Einrichtung externer Komponenten, ersetzt aber keine manuelle Prüfung der lokalen Umgebung.
+
 ## [1.3.0] - 2026-04-12
 
 ### Hinzugefügt

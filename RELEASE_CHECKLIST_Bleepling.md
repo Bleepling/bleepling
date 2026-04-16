@@ -21,6 +21,8 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] Startdateien und Startwege sind dokumentiert
 - [ ] neuer Reiter `Schnitt & Kapitel` ist in Code, Doku und Release-Unterlagen konsistent berücksichtigt
 - [ ] Reiter `Titelkarten` ist weiterhin in Code, Doku und Release-Unterlagen konsistent berücksichtigt
+- [ ] zweite Dachzeile sowie die erweiterten Text- und Vorschaufunktionen im Reiter `Titelkarten` sind in Code, Doku und Release-Unterlagen konsistent berücksichtigt
+- [ ] Reiter `Einstellungen / Logs` ist in Beschriftung, Hilfe und sichtbaren Einrichtungsbefehlen konsistent dokumentiert
 
 ## 3. Aufräumen vor Veröffentlichung
 
@@ -66,6 +68,7 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] vorhandene Arbeitsvideos lassen sich auswählen oder wiedererkennen
 - [ ] Clip-Erzeugung aus dem Schnittfenster funktioniert
 - [ ] Reiter `Titelkarten` startet und speichert ohne Fehlermeldung
+- [ ] Dachzeile, zweite Dachzeile und mehrzeiliger Titel werden in Vorschau und PNG-Export konsistent dargestellt
 - [ ] bestehende ältere Projekte lassen sich trotz neuer Titelkarten- und Schnitt-Struktur laden
 - [ ] Export nach `04_output/titlecards` funktioniert
 - [ ] freier PNG-Export funktioniert
@@ -82,6 +85,8 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] Third-Party-Hinweise sind mit dem Projektstand konsistent
 - [ ] neue Funktion `Schnitt & Kapitel` ist in README, Changelog und Benutzerdokumentation konsistent beschrieben
 - [ ] Funktion `Titelkarten` ist weiterhin in README, Changelog und Benutzerdokumentation konsistent beschrieben
+- [ ] zweite Dachzeile / Untertitel und die verfeinerte Titelkarten-Vorschau sind in README, Changelog und Benutzerdokumentation konsistent beschrieben
+- [ ] Bereich `Einstellungen / Logs` ist mit seiner aktuellen Struktur in README, Changelog und Benutzerdokumentation konsistent beschrieben
 
 ## 8. Vor dem finalen ZIP
 
@@ -99,8 +104,9 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] erste Release-Notiz vorbereitet
 - [ ] Entscheidung über GitHub, Codeberg oder beides getroffen
 - [ ] gegebenenfalls Topics/Schlagwörter vorbereitet
-- [ ] Release-Notiz für 1.3.0 erwähnt den neuen Reiter `Schnitt & Kapitel`
-- [ ] Release-Notiz erwähnt weiterhin den Reiter `Titelkarten`, soweit dies für die Gesamteinordnung des aktuellen Funktionsstands sinnvoll ist
+- [ ] Release-Notiz für 1.4.0 erwähnt die erweiterten Funktionen im Reiter `Titelkarten`
+- [ ] Release-Notiz für 1.4.0 erwähnt die geglättete Oberfläche des Reiters `Einstellungen / Logs`
+- [ ] Release-Notiz erwähnt weiterhin den Reiter `Schnitt & Kapitel`, soweit dies für die Gesamteinordnung des aktuellen Funktionsstands sinnvoll ist
 
 ## Notiz
 

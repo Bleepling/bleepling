@@ -18,7 +18,7 @@ Besonders wichtig sind:
 
 ## Aktueller Workflow-Stand
 
-Der sichtbare Hauptworkflow läuft im Projektstand **1.3.0** vor allem über den Reiter **„Prüfen & Entscheiden“** für den eigentlichen Anonymisierungsprozess. Ergänzend stehen jetzt der Reiter **„Schnitt & Kapitel“** für die vorbereitende manuelle Clip-Erzeugung aus Quellvideos sowie der Reiter **„Titelkarten“** für statische PNG-Karten zur Verfügung.
+Der sichtbare Hauptworkflow läuft im Projektstand **1.4.0** vor allem über den Reiter **„Prüfen & Entscheiden“** für den eigentlichen Anonymisierungsprozess. Ergänzend stehen jetzt der Reiter **„Schnitt & Kapitel“** für die vorbereitende manuelle Clip-Erzeugung aus Quellvideos sowie der Reiter **„Titelkarten“** für statische PNG-Karten mit Dachzeile, zweiter Dachzeile und Titelbox zur Verfügung.
 
 Beiträge an Bedienlogik, Statusführung, Times-Ableitung, Renderübergabe, Schnittfenster, Arbeitsvideo-Erzeugung und Titelkarten-Export sollten diesen Workflow respektieren.
 
@@ -68,7 +68,7 @@ Das gilt besonders für Änderungen an:
 - Schnitt- und Kapitelworkflow
 - Arbeitsvideo- und Clip-Erzeugung
 - Exportlogik
-- Titelkarten-Logik und PNG-Erzeugung
+- Titelkarten-Logik, mehrzeilige Titel, zweite Dachzeile und PNG-Erzeugung
 - Einstellungen und Diagnoseroutinen
 - Dateiformaten und Importpfaden
 

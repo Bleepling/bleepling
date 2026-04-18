@@ -293,8 +293,10 @@ class TitleCardsTab(ttk.Frame):
         self.font_var = tk.StringVar(value=default_font)
         self.header_bold_var = tk.BooleanVar(value=False)
         self.header_italic_var = tk.BooleanVar(value=False)
+        self.header_hidden_var = tk.BooleanVar(value=False)
         self.subtitle_bold_var = tk.BooleanVar(value=True)
         self.subtitle_italic_var = tk.BooleanVar(value=False)
+        self.subtitle_hidden_var = tk.BooleanVar(value=False)
         self.bold_var = tk.BooleanVar(value=False)
         self.italic_var = tk.BooleanVar(value=False)
         self.export_name_var = tk.StringVar(value="titelkarte.png")
@@ -343,12 +345,14 @@ class TitleCardsTab(ttk.Frame):
         header_style_row.pack(fill="x", pady=(4, 0))
         ttk.Checkbutton(header_style_row, text="Fett Dachzeile", variable=self.header_bold_var, command=self.update_preview).pack(side="left")
         ttk.Checkbutton(header_style_row, text="Kursiv Dachzeile", variable=self.header_italic_var, command=self.update_preview).pack(side="left", padx=(16, 0))
+        ttk.Checkbutton(header_style_row, text="Dachzeile ausblenden", variable=self.header_hidden_var, command=self.update_preview).pack(side="left", padx=(16, 0))
 
         self._add_entry("Zweite Dachzeile / Untertitel", self.subtitle_var)
         subtitle_style_row = ttk.Frame(self.ctrl_inner)
         subtitle_style_row.pack(fill="x", pady=(4, 0))
         ttk.Checkbutton(subtitle_style_row, text="Fett 2. Dachzeile", variable=self.subtitle_bold_var, command=self.update_preview).pack(side="left")
         ttk.Checkbutton(subtitle_style_row, text="Kursiv 2. Dachzeile", variable=self.subtitle_italic_var, command=self.update_preview).pack(side="left", padx=(16, 0))
+        ttk.Checkbutton(subtitle_style_row, text="2. Dachzeile ausblenden", variable=self.subtitle_hidden_var, command=self.update_preview).pack(side="left", padx=(16, 0))
 
         ttk.Label(self.ctrl_inner, text="Titel", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(8, 2))
         self.title_text = tk.Text(self.ctrl_inner, width=44, height=4, wrap="word")
@@ -436,8 +440,10 @@ class TitleCardsTab(ttk.Frame):
             self.font_var,
             self.header_bold_var,
             self.header_italic_var,
+            self.header_hidden_var,
             self.subtitle_bold_var,
             self.subtitle_italic_var,
+            self.subtitle_hidden_var,
             self.bold_var,
             self.italic_var,
             self.use_background_var,
@@ -541,8 +547,10 @@ class TitleCardsTab(ttk.Frame):
             self.font_var.set(data.get("font", self.font_var.get()))
             self.header_bold_var.set(bool(data.get("header_bold", False)))
             self.header_italic_var.set(bool(data.get("header_italic", False)))
+            self.header_hidden_var.set(bool(data.get("header_hidden", False)))
             self.subtitle_bold_var.set(bool(data.get("subtitle_bold", True)))
             self.subtitle_italic_var.set(bool(data.get("subtitle_italic", False)))
+            self.subtitle_hidden_var.set(bool(data.get("subtitle_hidden", False)))
             self.bold_var.set(bool(data.get("bold", False)))
             self.italic_var.set(bool(data.get("italic", False)))
             self.background_image_path = data.get("background_image_path", "")
@@ -590,8 +598,10 @@ class TitleCardsTab(ttk.Frame):
                 "font": self.font_var.get(),
                 "header_bold": self.header_bold_var.get(),
                 "header_italic": self.header_italic_var.get(),
+                "header_hidden": self.header_hidden_var.get(),
                 "subtitle_bold": self.subtitle_bold_var.get(),
                 "subtitle_italic": self.subtitle_italic_var.get(),
+                "subtitle_hidden": self.subtitle_hidden_var.get(),
                 "bold": self.bold_var.get(),
                 "italic": self.italic_var.get(),
                 "background_image_path": self.background_image_path,
@@ -657,7 +667,7 @@ class TitleCardsTab(ttk.Frame):
         th = bbox[3] - bbox[1]
         draw.text((x1 + (x2 - x1 - tw) / 2, y1 + (y2 - y1 - th) / 2), label, fill="#9CA3AF", font=slot_font)
 
-    def render_image(self):
+    def render_image(self, show_placeholders: bool = True):
         img = Image.new("RGBA", (CANVAS_W, CANVAS_H), "#F3F4F6")
         draw = ImageDraw.Draw(img)
 
@@ -677,8 +687,9 @@ class TitleCardsTab(ttk.Frame):
 
         if self.background_image is not None:
             bg = self.background_image.copy()
-            x, y, w, h = fit_cover(bg.width, bg.height, CANVAS_W, CANVAS_H)
+            x, y, w, h = fit_contain(bg.width, bg.height, CANVAS_W, CANVAS_H)
             bg = bg.resize((w, h), Image.LANCZOS)
+            draw.rectangle((0, 0, CANVAS_W, CANVAS_H), fill="#F3F4F6")
             img.alpha_composite(bg, (x, y))
         else:
             draw.rectangle((0, 0, CANVAS_W, CANVAS_H), fill="#F3F4F6")
@@ -710,7 +721,10 @@ class TitleCardsTab(ttk.Frame):
         box_color = COLORS[self.box_color_var.get()]
         align = ALIGNMENTS[self.align_var.get()]
 
-        if header_text:
+        header_hidden = self.header_hidden_var.get()
+        subtitle_hidden = self.subtitle_hidden_var.get()
+
+        if header_text and not header_hidden:
             header_bbox = draw.textbbox((0, 0), header_text, font=header_font)
             header_w = header_bbox[2] - header_bbox[0]
             header_x = (CANVAS_W - header_w) / 2
@@ -722,10 +736,10 @@ class TitleCardsTab(ttk.Frame):
                 header_color,
                 italic=self.header_italic_var.get(),
             )
-        else:
+        elif show_placeholders and not header_hidden:
             self._draw_neutral_text_slot(draw, header_box, "Reihe / Dachzeile")
 
-        if subtitle_text:
+        if subtitle_text and not subtitle_hidden:
             subtitle_bbox = draw.textbbox((0, 0), subtitle_text, font=subtitle_font)
             subtitle_w = subtitle_bbox[2] - subtitle_bbox[0]
             subtitle_x = (CANVAS_W - subtitle_w) / 2
@@ -737,7 +751,7 @@ class TitleCardsTab(ttk.Frame):
                 subtitle_color,
                 italic=self.subtitle_italic_var.get(),
             )
-        else:
+        elif show_placeholders and not subtitle_hidden:
             self._draw_neutral_text_slot(draw, subtitle_box, "Zweite Dachzeile / Untertitel")
 
         if self.show_title_box_var.get():
@@ -806,7 +820,7 @@ class TitleCardsTab(ttk.Frame):
 
     def update_preview(self):
         try:
-            img = self.render_image().convert("RGB")
+            img = self.render_image(show_placeholders=True).convert("RGB")
             canvas_w = max(400, self.preview_canvas.winfo_width())
             canvas_h = max(300, self.preview_canvas.winfo_height())
             scale = min((canvas_w - 24) / CANVAS_W, (canvas_h - 24) / CANVAS_H)
@@ -855,8 +869,10 @@ class TitleCardsTab(ttk.Frame):
         self.align_var.set("Zentriert")
         self.header_bold_var.set(False)
         self.header_italic_var.set(False)
+        self.header_hidden_var.set(False)
         self.subtitle_bold_var.set(True)
         self.subtitle_italic_var.set(False)
+        self.subtitle_hidden_var.set(False)
         if "Arial" in self.font_names:
             self.font_var.set("Arial")
         elif self.font_names:
@@ -878,7 +894,7 @@ class TitleCardsTab(ttk.Frame):
             if not path:
                 self.status_var.set("Export abgebrochen.")
                 return
-            img = self.render_image().convert("RGB")
+            img = self.render_image(show_placeholders=False).convert("RGB")
             img.save(path, format="PNG")
             self.status_var.set(f"PNG exportiert: {os.path.basename(path)}")
         except Exception as exc:
@@ -897,7 +913,7 @@ class TitleCardsTab(ttk.Frame):
             if not filename.lower().endswith(".png"):
                 filename += ".png"
             target = out_dir / filename
-            img = self.render_image().convert("RGB")
+            img = self.render_image(show_placeholders=False).convert("RGB")
             img.save(target, format="PNG")
             self.status_var.set(f"In Projekt exportiert: {target.name}")
         except Exception as exc:

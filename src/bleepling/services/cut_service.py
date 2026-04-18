@@ -10,6 +10,10 @@ from pathlib import Path
 from bleepling.services.time_service import format_time_point, parse_time_point
 
 
+class RenderCancelledError(RuntimeError):
+    pass
+
+
 class CutService:
     def _ffmpeg(self) -> str | None:
         return shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
@@ -112,7 +116,14 @@ class CutService:
                     return path
         return None
 
-    def build_working_video(self, project, source_files: list[Path], output_stem: str | None = None) -> Path:
+    def build_working_video(
+        self,
+        project,
+        source_files: list[Path],
+        output_stem: str | None = None,
+        proc_callback=None,
+        cancel_event=None,
+    ) -> Path:
         ffmpeg = self._ffmpeg()
         if not ffmpeg:
             raise RuntimeError("FFmpeg wurde nicht gefunden.")
@@ -150,11 +161,20 @@ class CutService:
                 "-movflags", "+faststart",
                 str(target),
             ]
-        self._run(cmd, "Arbeitsvideo konnte nicht erzeugt werden.")
+        self._run(cmd, "Arbeitsvideo konnte nicht erzeugt werden.", proc_callback=proc_callback, cancel_event=cancel_event, output_path=target)
         self.write_working_manifest(target, source_files)
         return target
 
-    def create_clip(self, project, working_video: Path, start_s: float, end_s: float, title: str) -> Path:
+    def create_clip(
+        self,
+        project,
+        working_video: Path,
+        start_s: float,
+        end_s: float,
+        title: str,
+        proc_callback=None,
+        cancel_event=None,
+    ) -> Path:
         ffmpeg = self._ffmpeg()
         if not ffmpeg:
             raise RuntimeError("FFmpeg wurde nicht gefunden.")
@@ -176,7 +196,7 @@ class CutService:
             "-movflags", "+faststart",
             str(target),
         ]
-        self._run(cmd, f"Clip '{name}' konnte nicht erzeugt werden.")
+        self._run(cmd, f"Clip '{name}' konnte nicht erzeugt werden.", proc_callback=proc_callback, cancel_event=cancel_event, output_path=target)
         return target
 
     def open_in_system(self, path: Path) -> None:
@@ -189,9 +209,31 @@ class CutService:
         else:
             raise RuntimeError("Der Zielpfad kann auf diesem System nicht automatisch geöffnet werden.")
 
-    def _run(self, cmd: list[str], error_prefix: str) -> None:
+    def _run(self, cmd: list[str], error_prefix: str, proc_callback=None, cancel_event=None, output_path: Path | None = None) -> None:
+        proc = None
         try:
-            subprocess.run(cmd, capture_output=True, text=True, check=True)
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if callable(proc_callback):
+                proc_callback(proc)
+            stdout, stderr = proc.communicate()
+            if cancel_event is not None and getattr(cancel_event, "is_set", lambda: False)():
+                raise RenderCancelledError("Renderprozess wurde abgebrochen.")
+            if proc.returncode != 0:
+                msg = (stderr or stdout or "").strip()
+                raise RuntimeError(f"{error_prefix} {msg}".strip())
         except subprocess.CalledProcessError as exc:
             msg = (exc.stderr or exc.stdout or "").strip()
             raise RuntimeError(f"{error_prefix} {msg}".strip()) from exc
+        except RenderCancelledError:
+            if output_path and output_path.exists():
+                try:
+                    output_path.unlink()
+                except Exception:
+                    pass
+            raise
+        finally:
+            if callable(proc_callback):
+                try:
+                    proc_callback(None)
+                except Exception:
+                    pass

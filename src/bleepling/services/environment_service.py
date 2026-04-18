@@ -127,7 +127,7 @@ class EnvironmentService:
             "1) Python-Pakete wie faster-whisper, ctranslate2 und python-vlc gehören in dieselbe Python-Umgebung, mit der Bleepling gestartet wird.\n"
             "2) Für den Reiter 'Treffer prüfen' wird zusätzlich eine normale VLC-Desktop-Installation benötigt, weil python-vlc nur die Python-Anbindung liefert, nicht aber libvlc.dll selbst.\n"
             "3) CUDA-/cuDNN-DLLs müssen in einem Ordner liegen, der für den Bleepling-Prozess erreichbar ist, idealerweise in einem dedizierten CUDA-bin-Ordner oder in einem von Bleepling konfigurierten Zusatzpfad.\n"
-            "4) Nach einer Nachinstallation bitte die Prüfung erneut ausführen.\n"
+            "4) Nach einer Nachinstallation bitte die Prüfung einfach noch einmal über 'Prüfung ausführen' starten.\n"
             "5) Für fremde PCs ist ein konfigurierbarer Zusatzpfad robuster als verteilte Einzel-DLLs in zufälligen Programmen."
         )
 

@@ -1,5 +1,7 @@
 
 from __future__ import annotations
+import os
+import re
 import shutil
 import subprocess
 import threading
@@ -42,6 +44,8 @@ def _read_lines(text: str):
 
 def _safe_float(value, default=0.0):
     try:
+        if isinstance(value, str):
+            value = value.strip().replace(",", ".")
         return float(value)
     except Exception:
         return default
@@ -70,12 +74,13 @@ class TargetedEditTab(ttk.Frame):
         self.progress_var = tk.DoubleVar(value=0.0)
         self.progress_text_var = tk.StringVar(value="")
         self.render_queue = queue.Queue()
+        self.last_output_file: Path | None = None
 
         self.media_var = tk.StringVar()
         self.pre_image_var = tk.StringVar()
         self.post_image_var = tk.StringVar()
-        self.pre_seconds_var = tk.DoubleVar(value=3.0)
-        self.post_seconds_var = tk.DoubleVar(value=3.0)
+        self.pre_seconds_var = tk.StringVar(value="3.0")
+        self.post_seconds_var = tk.StringVar(value="3.0")
         self.pre_ms_var = tk.IntVar(value=600)
         self.post_ms_var = tk.IntVar(value=1000)
 
@@ -96,10 +101,38 @@ class TargetedEditTab(ttk.Frame):
     def _output_video_dir(self, p) -> Path:
         return getattr(p, "output_video_dir", p.root_path / "04_output" / "videos")
 
+    def _titlecards_dir(self, p) -> Path:
+        path = getattr(p, "titlecards_output_dir", p.root_path / "04_output" / "titlecards")
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def _current_output_file(self) -> Path | None:
+        media = self._media_path()
+        if self.last_output_file and self.last_output_file.exists() and media is not None:
+            if self.last_output_file.name.lower().startswith(f"{media.stem}_edited".lower()):
+                return self.last_output_file
+        project = self._project()
+        if not project or media is None:
+            return None
+        return self._find_existing_output_file(project, media.stem)
+
+    def _find_vlc(self) -> str | None:
+        candidates = [
+            shutil.which("vlc"),
+            shutil.which("vlc.exe"),
+            r"C:\Program Files\VideoLAN\VLC\vlc.exe",
+            r"C:\Program Files (x86)\VideoLAN\VLC\vlc.exe",
+        ]
+        for candidate in candidates:
+            if candidate and Path(candidate).exists():
+                return str(candidate)
+        return None
+
     def _set_status(self, msg: str):
         if hasattr(self.app, "set_status"):
             try:
-                self.app.set_status(msg)
+                short_msg = (msg or "").splitlines()[0].strip() or "Bereit."
+                self.app.set_status(short_msg)
             except Exception:
                 pass
         try:
@@ -107,6 +140,39 @@ class TargetedEditTab(ttk.Frame):
             self.log_box.insert("1.0", msg)
         except Exception:
             pass
+
+    def _find_existing_output_file(self, project, media_stem: str) -> Path | None:
+        out_dir = self._output_video_dir(project)
+        if not out_dir.exists():
+            return None
+        pattern = re.compile(rf"^{re.escape(media_stem)}_edited(?:-(\d{{2}}))?\.mp4$", re.IGNORECASE)
+        matches: list[tuple[int, Path]] = []
+        for path in out_dir.iterdir():
+            if not path.is_file():
+                continue
+            match = pattern.match(path.name)
+            if not match:
+                continue
+            suffix = match.group(1)
+            rank = int(suffix) if suffix else 0
+            matches.append((rank, path))
+        if not matches:
+            return None
+        matches.sort(key=lambda item: item[0])
+        return matches[-1][1]
+
+    def _build_output_file(self, project, media_stem: str) -> Path:
+        out_dir = self._output_video_dir(project)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        base = out_dir / f"{media_stem}_edited.mp4"
+        if not base.exists():
+            return base
+        counter = 1
+        while True:
+            candidate = out_dir / f"{media_stem}_edited-{counter:02d}.mp4"
+            if not candidate.exists():
+                return candidate
+            counter += 1
 
     def _probe_media(self, media_path: Path) -> dict:
         ffprobe = self._ffprobe()
@@ -172,22 +238,79 @@ class TargetedEditTab(ttk.Frame):
             self.image_hint_var.set("Idealgröße für Vor- und Nachspannbild: konnte nicht gelesen werden")
 
     def _pick_pre_image(self):
+        project = self._project()
+        initialdir = None
+        current = self.pre_image_var.get().strip()
+        if current:
+            current_path = Path(current)
+            if current_path.exists():
+                initialdir = str(current_path.parent)
+        if initialdir is None and project:
+            initialdir = str(self._titlecards_dir(project))
         path = filedialog.askopenfilename(
             title="Bild für Vorspann auswählen",
+            initialdir=initialdir,
             filetypes=[("Bilddateien", "*.png;*.jpg;*.jpeg;*.webp;*.bmp")],
         )
         if path:
             self.pre_image_var.set(path)
 
     def _pick_post_image(self):
+        project = self._project()
+        initialdir = None
+        current = self.post_image_var.get().strip()
+        if current:
+            current_path = Path(current)
+            if current_path.exists():
+                initialdir = str(current_path.parent)
+        if initialdir is None and project:
+            initialdir = str(self._titlecards_dir(project))
         path = filedialog.askopenfilename(
             title="Bild für Nachspann auswählen",
+            initialdir=initialdir,
             filetypes=[("Bilddateien", "*.png;*.jpg;*.jpeg;*.webp;*.bmp")],
         )
         if path:
             self.post_image_var.set(path)
 
+    def _get_segment_seconds(self, value, label: str) -> float:
+        text = str(value).strip()
+        seconds = _safe_float(text, -1.0)
+        if seconds <= 0.0:
+            raise RuntimeError(f"Bitte bei {label} eine gueltige Dauer in Sekunden eingeben, z. B. 8.5 oder 8,5.")
+        return seconds
+
+    def _open_output_dir(self):
+        project = self._project()
+        if not project:
+            messagebox.showerror("Gezielte Nachbearbeitung", "Kein Projekt geladen.")
+            return
+        out_dir = self._output_video_dir(project)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            os.startfile(str(out_dir))
+        except Exception as exc:
+            messagebox.showerror("Gezielte Nachbearbeitung", f"Output-Ordner konnte nicht geöffnet werden:\n{exc}")
+
+    def _play_output_video(self):
+        output_file = self._current_output_file()
+        if output_file is None:
+            messagebox.showerror("Gezielte Nachbearbeitung", "Bitte zuerst ein Video im Projekt auswählen.")
+            return
+        if not output_file.exists():
+            messagebox.showerror("Gezielte Nachbearbeitung", "Es wurde noch kein gerendertes Ergebnis für dieses Video gefunden.")
+            return
+        vlc_path = self._find_vlc()
+        if not vlc_path:
+            messagebox.showerror("Gezielte Nachbearbeitung", "VLC wurde auf diesem Rechner nicht gefunden.")
+            return
+        try:
+            subprocess.Popen([vlc_path, str(output_file)])
+        except Exception as exc:
+            messagebox.showerror("Gezielte Nachbearbeitung", f"Das Ergebnis konnte nicht mit VLC abgespielt werden:\n{exc}")
+
     def _on_media_changed(self, *_):
+        self.last_output_file = None
         self._refresh_hint()
 
     def _get_ffmpeg_bleep_settings(self):
@@ -306,6 +429,8 @@ class TargetedEditTab(ttk.Frame):
                     self.update_idletasks()
                 elif kind == "done":
                     self._hide_progress_window()
+                    output_file = item.get("output_file")
+                    self.last_output_file = Path(output_file) if output_file else None
                     self._set_status(item.get("message", "Rendern abgeschlossen."))
                     return
                 elif kind == "error":
@@ -364,7 +489,7 @@ class TargetedEditTab(ttk.Frame):
     def _worker(self, media: Path, out_file: Path, prepend: str, append: str, intervals):
         temp_audio = None
         temp_targeted = None
-        temp_concat_video = None
+        temp_concat_media = None
         try:
             ffmpeg = self._ffmpeg()
             if not ffmpeg:
@@ -379,7 +504,6 @@ class TargetedEditTab(ttk.Frame):
             out_dir.mkdir(parents=True, exist_ok=True)
 
             working_video = media
-            working_audio = media
 
             if intervals:
                 self.render_queue.put({"kind": "progress", "percent": 5.0, "label": "Schritt 1/2: Gezielte Bleeps werden vorbereitet"})
@@ -418,80 +542,75 @@ class TargetedEditTab(ttk.Frame):
                     raise RuntimeError((err or "Fehler beim gezielten Nachbleepen")[:5000])
 
                 working_video = temp_targeted
-                working_audio = temp_targeted
-
             have_pre = bool(prepend)
             have_post = bool(append)
 
             if have_pre or have_post:
                 self.render_queue.put({"kind": "progress", "percent": 72.0 if intervals else 8.0, "label": "Schritt 2/2: Vor- und Nachspann werden gemeinsam gerendert"})
-                temp_concat_video = out_dir / f"{out_file.stem}.tmp_concat_video.mp4"
+                temp_concat_media = out_dir / f"{out_file.stem}.tmp_concat_media.mp4"
 
                 inputs = []
                 filter_parts = []
                 concat_labels = []
-                idx = 0
+                segment_idx = 0
+                input_idx = 0
 
-                def add_image(image_path: str, seconds: float):
-                    nonlocal idx
+                pre_seconds = self._get_segment_seconds(self.pre_seconds_var.get(), "Bild voranstellen") if have_pre else 0.0
+                post_seconds = self._get_segment_seconds(self.post_seconds_var.get(), "Bild hintenanstellen") if have_post else 0.0
+
+                def add_image_segment(image_path: str, seconds: float):
+                    nonlocal segment_idx, input_idx
+                    video_input_idx = input_idx
                     inputs.extend(["-loop", "1", "-t", str(seconds), "-i", image_path])
+                    input_idx += 1
+                    audio_input_idx = video_input_idx + 1
+                    inputs.extend(["-f", "lavfi", "-t", str(seconds), "-i", "anullsrc=r=48000:cl=stereo"])
+                    input_idx += 1
                     filter_parts.append(
-                        f"[{idx}:v]scale={width}:{height}:force_original_aspect_ratio=decrease,"
-                        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=25,format=yuv420p[v{idx}]"
+                        f"[{video_input_idx}:v:0]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+                        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=25,format=yuv420p[vseg{segment_idx}]"
                     )
-                    concat_labels.append(f"[v{idx}]")
-                    idx += 1
+                    filter_parts.append(f"[{audio_input_idx}:a:0]aresample=48000,asetpts=PTS-STARTPTS[aseg{segment_idx}]")
+                    concat_labels.append(f"[vseg{segment_idx}][aseg{segment_idx}]")
+                    segment_idx += 1
 
                 if have_pre:
-                    add_image(prepend, float(self.pre_seconds_var.get()))
+                    add_image_segment(prepend, pre_seconds)
 
+                video_input_idx = input_idx
                 inputs.extend(["-i", str(working_video)])
+                input_idx += 1
                 filter_parts.append(
-                    f"[{idx}:v]scale={width}:{height}:force_original_aspect_ratio=decrease,"
-                    f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=25,format=yuv420p[v{idx}]"
+                    f"[{video_input_idx}:v:0]scale={width}:{height}:force_original_aspect_ratio=decrease,"
+                    f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=25,format=yuv420p[vseg{segment_idx}]"
                 )
-                concat_labels.append(f"[v{idx}]")
-                idx += 1
+                filter_parts.append(f"[{video_input_idx}:a:0]aresample=48000,asetpts=PTS-STARTPTS[aseg{segment_idx}]")
+                concat_labels.append(f"[vseg{segment_idx}][aseg{segment_idx}]")
+                segment_idx += 1
 
                 if have_post:
-                    add_image(append, float(self.post_seconds_var.get()))
+                    add_image_segment(append, post_seconds)
 
-                filter_parts.append(f"{''.join(concat_labels)}concat=n={len(concat_labels)}:v=1:a=0[vout]")
+                filter_parts.append(f"{''.join(concat_labels)}concat=n={segment_idx}:v=1:a=1[vout][aout]")
                 filter_complex = ";".join(filter_parts)
 
                 codec = "h264_nvenc" if shutil.which("nvidia-smi") else "libx264"
-                cmd_video = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y"] + inputs + [
+                cmd_video = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-progress", "pipe:1", "-nostats"] + inputs + [
                     "-filter_complex", filter_complex,
                     "-map", "[vout]",
-                    "-an",
+                    "-map", "[aout]",
                     "-c:v", codec,
                 ]
                 if codec == "h264_nvenc":
                     cmd_video += ["-preset", "p5", "-cq", "30"]
                 else:
                     cmd_video += ["-preset", "medium", "-crf", "30"]
-                cmd_video += [str(temp_concat_video)]
-                res = self._run_simple(cmd_video)
-                if res.returncode != 0:
-                    raise RuntimeError((res.stderr or res.stdout or "Fehler beim Zusammensetzen von Vor- und Nachspann")[:5000])
-
-                final_duration = duration + (float(self.pre_seconds_var.get()) if have_pre else 0.0) + (float(self.post_seconds_var.get()) if have_post else 0.0)
-                cmd_final = [
-                    ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-progress", "pipe:1", "-nostats",
-                    "-i", str(temp_concat_video),
-                    "-i", str(working_audio),
-                    "-map", "0:v:0",
-                    "-map", "1:a:0",
-                    "-c:v", "copy",
-                    "-c:a", "aac",
-                    "-b:a", "96k",
-                    "-movflags", "+faststart",
-                    "-shortest",
-                    str(out_file),
-                ]
-                rc, err = self._run_progress_cmd(cmd_final, max(final_duration, 1.0))
+                final_duration = duration + (pre_seconds if have_pre else 0.0) + (post_seconds if have_post else 0.0)
+                cmd_video += ["-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(temp_concat_media)]
+                rc, err = self._run_progress_cmd(cmd_video, max(final_duration, 1.0))
                 if rc != 0:
-                    raise RuntimeError((err or "Fehler beim finalen Zusammenführen")[:5000])
+                    raise RuntimeError((err or "Fehler beim Zusammensetzen von Vor- und Nachspann")[:5000])
+                shutil.move(str(temp_concat_media), str(out_file))
             else:
                 if intervals:
                     shutil.move(str(working_video), str(out_file))
@@ -501,12 +620,13 @@ class TargetedEditTab(ttk.Frame):
             self.render_queue.put({
                 "kind": "done",
                 "message": f"Änderungen gerendert.\nAusgabedatei: {out_file.name}\nAusgabeordner: {out_dir}",
+                "output_file": str(out_file),
             })
         except Exception as e:
             self.proc = None
             self.render_queue.put({"kind": "error", "message": f"Rendern fehlgeschlagen: {e}"})
         finally:
-            for temp in (temp_audio, temp_targeted, temp_concat_video):
+            for temp in (temp_audio, temp_targeted, temp_concat_media):
                 try:
                     if temp and temp.exists():
                         temp.unlink()
@@ -529,7 +649,8 @@ class TargetedEditTab(ttk.Frame):
             return
 
         stem = media.stem
-        out_file = self._output_video_dir(p) / f"{stem}_edited.mp4"
+        out_file = self._build_output_file(p, stem)
+        self.last_output_file = out_file
 
         self._show_progress_window()
         self.progress_text_var.set("Änderungen werden vorbereitet …")
@@ -599,5 +720,29 @@ class TargetedEditTab(ttk.Frame):
         ).pack(anchor="w", padx=8, pady=(8, 6))
         ttk.Button(runf, text="Änderungen rendern", command=self.render_changes, style="Accent.TButton").pack(anchor="w", padx=8, pady=(0, 8))
 
-        self.log_box = tk.Text(self, height=10, wrap="word")
-        self.log_box.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        bottom = ttk.Frame(self)
+        bottom.pack(fill="x", padx=12, pady=(0, 12))
+
+        self.log_box = tk.Text(bottom, height=5, wrap="word")
+        self.log_box.pack(fill="x", pady=(0, 6))
+
+        actions = ttk.Frame(bottom)
+        actions.pack(fill="x")
+        tk.Button(
+            actions,
+            text="Ergebnis abspielen",
+            command=self._play_output_video,
+            bg="#c62828",
+            fg="white",
+            activebackground="#b71c1c",
+            activeforeground="white",
+            relief="raised",
+            bd=1,
+            highlightthickness=1,
+            highlightbackground="black",
+            highlightcolor="black",
+            width=22,
+            padx=6,
+            pady=4,
+        ).pack(side="right")
+        ttk.Button(actions, text="Output-Ordner öffnen", command=self._open_output_dir, width=22).pack(side="right", padx=(0, 8))

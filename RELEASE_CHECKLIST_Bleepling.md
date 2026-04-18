@@ -86,6 +86,9 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] neue Funktion `Schnitt & Kapitel` ist in README, Changelog und Benutzerdokumentation konsistent beschrieben
 - [ ] Funktion `Titelkarten` ist weiterhin in README, Changelog und Benutzerdokumentation konsistent beschrieben
 - [ ] zweite Dachzeile / Untertitel und die verfeinerte Titelkarten-Vorschau sind in README, Changelog und Benutzerdokumentation konsistent beschrieben
+- [ ] aktuelle Trennung von Platzhalter-Vorschau und PNG-Export im Reiter `Titelkarten` ist in README, Changelog und Benutzerdokumentation konsistent beschrieben
+- [ ] Reiter `Gezielte Nachbearbeitung` ist mit synchronen Vor-/Nachspannbildern, Komma-Eingaben und Output-Buttons konsistent dokumentiert
+- [ ] Reiter `Medien` ist mit seiner erweiterten Projektübersicht und den abschnittsbezogenen Ordner-Buttons konsistent dokumentiert
 - [ ] Bereich `Einstellungen / Logs` ist mit seiner aktuellen Struktur in README, Changelog und Benutzerdokumentation konsistent beschrieben
 
 ## 8. Vor dem finalen ZIP
@@ -104,8 +107,9 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] erste Release-Notiz vorbereitet
 - [ ] Entscheidung über GitHub, Codeberg oder beides getroffen
 - [ ] gegebenenfalls Topics/Schlagwörter vorbereitet
-- [ ] Release-Notiz für 1.4.1 erwähnt die flexiblere Teilnehmerlisten-Übernahme im Reiter `Prüfen & Entscheiden`
-- [ ] Release-Notiz für 1.4.1 erwähnt die robustere PDF-Verarbeitung von Teilnehmerverzeichnissen
+- [ ] Release-Notiz für 1.5.0 erwähnt die überarbeitete Medienübersicht
+- [ ] Release-Notiz für 1.5.0 erwähnt die sichtbaren Verbesserungen in `Titelkarten` und `Gezielte Nachbearbeitung`
+- [ ] Release-Notiz für 1.5.0 erwähnt die wirksame Abbruchlogik bei längeren Renderläufen
 - [ ] Release-Notiz erwähnt weiterhin den Reiter `Schnitt & Kapitel`, soweit dies für die Gesamteinordnung des aktuellen Funktionsstands sinnvoll ist
 
 ## Notiz

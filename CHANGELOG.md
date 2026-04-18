@@ -4,6 +4,32 @@ Alle nennenswerten Änderungen an **Bleepling** sollen in dieser Datei dokumenti
 
 Die Struktur orientiert sich an einer einfachen, für Open-Source-Projekte gut lesbaren Versionshistorie.
 
+## [1.5.0] - 2026-04-18
+
+### Hinzugefügt
+- Medien-Reiter als deutlich umfassendere Projektübersicht mit getrennten Bereichen für Quellvideos, Projektclips, Transkriptionsdateien, Kandidatenstände, Arbeitsvideos, Output-Dateien und Titelkarten
+- abschnittsbezogene Buttons **„Ordner öffnen“** im Medien-Reiter
+- zusätzliche Schalter zum gezielten Ausblenden von Dachzeile und zweiter Dachzeile im Reiter **„Titelkarten“**
+- Buttons **„Output-Ordner öffnen“** und **„Ergebnis abspielen“** im Reiter **„Gezielte Nachbearbeitung“**
+
+### Geändert
+- Titelkarten-Vorschau und PNG-Export sind jetzt sauber getrennt: Platzhalter für Dachzeilen bleiben reine Vorschauhilfen
+- Hintergrundbilder im Reiter **„Titelkarten“** werden auf das Zielformat eingepasst, statt unkontrolliert beschnitten zu werden
+- Vor- und Nachspannbilder in **„Gezielte Nachbearbeitung“** werden mit synchron verlängerter stiller Audiospur zusammengesetzt
+- Kommawerte wie `8,5` werden bei Vor- und Nachspandauern akzeptiert
+- vorhandene Output-Dateien in der gezielten Nachbearbeitung werden nicht mehr überschrieben, sondern automatisch mit Suffixen wie `-01` fortgeschrieben
+- Button-Hover, Mausrad-Scrolling und Fenster-/Dialogverhalten wurden reiterübergreifend vereinheitlicht
+- der Reiter **„Einstellungen / Logs“** wurde sprachlich bereinigt; doppelte Prüf-Buttons entfallen
+- README, Release-Unterlagen und Benutzerdokumentation auf den Stand **1.5.0** fortgeschrieben
+
+### Behoben
+- Abbruchlogik beim Rendern von Arbeitsvideos, Clips und FFmpeg-Exports funktioniert jetzt tatsächlich, statt Benutzerabbrüche als Fehler zu melden
+- der Fortschrittsdialog im FFmpeg-Export bleibt bei vielen Bleeps in Schritt 1 sichtbar aktiv
+- bereits exportierte Titelkarten werden in der gezielten Nachbearbeitung zuverlässig wiedergefunden und als Ausgangspfad angeboten
+- Medienlisten zeigen keine fachlich irreführenden Mischkategorien mehr wie JSON-Dateien zwischen Arbeitsvideos
+- Auswahldialoge im Reiter **„Schnitt & Kapitel“** öffnen mittig statt links oben
+- verschiedene Status-, Hilfe- und Wartetexte wurden sprachlich geglättet und an die tatsächliche Logik angepasst
+
 ## [1.4.1] - 2026-04-16
 
 ### Geändert

@@ -1,2 +1,2 @@
 __app_name__ = "Bleepling"
-__version__ = "0.1.0-scaffold"
+__version__ = "1.5.0"

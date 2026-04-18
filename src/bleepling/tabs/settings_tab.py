@@ -88,7 +88,6 @@ class SettingsTab(ttk.Frame):
         for txt, cmd in [
             ("Projekt speichern", self.save_settings),
             ("Prüfung ausführen", self.run_checks),
-            ("Prüfung erneut ausführen", self.run_checks),
             ("Installations-CMD kopieren", self.copy_install),
             ("Installations-CMD ausführen", self.run_install_cmd),
             ("CUDA-/PATH-CMD kopieren", self.copy_path),
@@ -231,7 +230,7 @@ class SettingsTab(ttk.Frame):
         ttk.Label(frame, text="Prüfung läuft gerade ... bitte warten", justify="center").pack(pady=(0, 10))
         ttk.Label(
             frame,
-            text="Die Prüfpunkte erscheinen weiterhin schrittweise in der Liste.",
+            text="Die Prüfpunkte erscheinen schrittweise in der Liste.",
             justify="center",
             wraplength=420,
         ).pack(pady=(6, 0))
@@ -315,7 +314,7 @@ class SettingsTab(ttk.Frame):
             "4) Fehlen Bausteine, kopieren Sie den Installationsbefehl und fügen ihn in CMD ein.\n"
             "5) Fehlt VLC, installieren Sie die normale VLC-Desktop-App und danach die passende Anbindung.\n"
             "6) Fehlen GPU-Dateien, tragen Sie den passenden Ordner bei 'Zusätzliche CUDA-Pfade' ein.\n"
-            "7) Klicken Sie danach auf 'Prüfung erneut ausführen'.\n\n"
+            "7) Wenn Sie die Prüfung später noch einmal brauchen, klicken Sie einfach erneut auf 'Prüfung ausführen'.\n\n"
             "Für die sichtbaren Prüf- und Entscheidungsreiter sollten mindestens diese Punkte auf ok stehen:\n"
             "- VLC-Anbindung\n"
             "- VLC Desktop-App\n"

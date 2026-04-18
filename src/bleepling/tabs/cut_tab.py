@@ -225,7 +225,19 @@ class CutTab(ttk.Frame):
         self.progress_text_var = tk.StringVar(value="0 %")
         self.progress_img = None
         self._progress_queue: queue.Queue = queue.Queue()
+        self.active_render_proc = None
+        self.cancel_requested = threading.Event()
         self._build()
+
+    def _center_window(self, win: tk.Toplevel):
+        try:
+            win.update_idletasks()
+            root = self.winfo_toplevel()
+            rx, ry, rw, rh = root.winfo_rootx(), root.winfo_rooty(), root.winfo_width(), root.winfo_height()
+            ww, wh = win.winfo_width(), win.winfo_height()
+            win.geometry(f"+{rx + max(0, (rw-ww)//2)}+{ry + max(0, (rh-wh)//2)}")
+        except Exception:
+            pass
 
 
 
@@ -573,6 +585,7 @@ class CutTab(ttk.Frame):
         btns.pack(fill="x")
         ttk.Button(btns, text="Übernehmen", command=accept, style="Accent.TButton").pack(side="right")
         ttk.Button(btns, text="Abbrechen", command=win.destroy, style="Accent.TButton").pack(side="right", padx=(0, 6))
+        self._center_window(win)
 
     def remove_source_video(self):
         sel = self.source_list.curselection()
@@ -667,6 +680,7 @@ class CutTab(ttk.Frame):
         btns.pack(fill="x")
         ttk.Button(btns, text="Übernehmen", command=accept, style="Accent.TButton").pack(side="right")
         ttk.Button(btns, text="Abbrechen", command=win.destroy, style="Accent.TButton").pack(side="right", padx=(0, 6))
+        self._center_window(win)
 
     def rebuild_working_video(self):
         self.build_working_video(force=True)
@@ -674,6 +688,7 @@ class CutTab(ttk.Frame):
     def _show_progress_window(self):
         if self.progress_win is not None:
             return
+        self.cancel_requested.clear()
         win = tk.Toplevel(self)
         win.title("Bleepling rendert")
         win.transient(self.winfo_toplevel())
@@ -696,7 +711,7 @@ class CutTab(ttk.Frame):
         bar.pack(pady=(0, 6))
         bar.start(10)
         self.progress_bar = bar
-        ttk.Button(frame, text="Rendern abbrechen", command=lambda: None, style="Accent.TButton").pack(pady=(12, 0))
+        ttk.Button(frame, text="Rendern abbrechen", command=self.cancel_render, style="Accent.TButton").pack(pady=(12, 0))
         win.update_idletasks()
         root = self.winfo_toplevel()
         rx, ry, rw, rh = root.winfo_rootx(), root.winfo_rooty(), root.winfo_width(), root.winfo_height()
@@ -717,6 +732,21 @@ class CutTab(ttk.Frame):
             pass
         self.progress_win = None
         self.progress_bar = None
+        self.active_render_proc = None
+        self.cancel_requested.clear()
+
+    def _set_active_render_proc(self, proc):
+        self.active_render_proc = proc
+
+    def cancel_render(self):
+        self.cancel_requested.set()
+        proc = self.active_render_proc
+        try:
+            if proc is not None and proc.poll() is None:
+                proc.terminate()
+        except Exception:
+            pass
+        self._set_status("Renderabbruch angefordert …")
 
     def _poll_progress_queue(self):
         try:
@@ -772,7 +802,12 @@ class CutTab(ttk.Frame):
 
         def worker():
             try:
-                target = self.cut_service.build_working_video(p, paths)
+                target = self.cut_service.build_working_video(
+                    p,
+                    paths,
+                    proc_callback=self._set_active_render_proc,
+                    cancel_event=self.cancel_requested,
+                )
                 self._progress_queue.put({"kind": "done", "target": str(target)})
             except Exception as exc:
                 self._progress_queue.put({"kind": "error", "message": str(exc)})
@@ -1208,6 +1243,8 @@ class CutTab(ttk.Frame):
                     self.cut_service.ts_to_seconds(row["begin"]),
                     self.cut_service.ts_to_seconds(row["end"]),
                     row["title"],
+                    proc_callback=self._set_active_render_proc,
+                    cancel_event=self.cancel_requested,
                 )
                 self._progress_queue.put({"kind": "done_selected_clip", "target": str(out)})
             except Exception as exc:
@@ -1233,12 +1270,16 @@ class CutTab(ttk.Frame):
         def worker():
             try:
                 for row in rows:
+                    if self.cancel_requested.is_set():
+                        raise RuntimeError("Renderprozess wurde abgebrochen.")
                     self.cut_service.create_clip(
                         p,
                         self.working_video_path,
                         self.cut_service.ts_to_seconds(row["begin"]),
                         self.cut_service.ts_to_seconds(row["end"]),
                         row["title"],
+                        proc_callback=self._set_active_render_proc,
+                        cancel_event=self.cancel_requested,
                     )
                 self._progress_queue.put({
                     "kind": "done_all_clips",

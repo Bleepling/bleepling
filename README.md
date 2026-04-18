@@ -4,7 +4,7 @@ Bleepling ist eine lokal laufende Open-Source-Anwendung zur Anonymisierung von A
 
 Die Anwendung unterstützt einen nachvollziehbaren Prüf-Workflow: Aus einem Video oder einer Audioquelle werden Transkriptionsdaten erzeugt, daraus Kandidaten für mögliche Namensnennungen abgeleitet, diese werden menschlich geprüft und anschließend in Form einer Times-Datei für den finalen Bleep-Export verwendet.
 
-Seit Version **1.2.1** enthält Bleepling zusätzlich den Reiter **„Titelkarten“**. Seit Version **1.3.0** kommt mit **„Schnitt & Kapitel“** ein weiterer Arbeitsbereich hinzu, mit dem aus vorhandenen Quellvideos zunächst ein Arbeitsvideo gebildet und daraus einzelne Clips für den weiteren Prüf-Workflow erzeugt werden können. Mit Version **1.4.0** wurde insbesondere der Titelkarten-Reiter deutlich ausgebaut und der Reiter **„Einstellungen / Logs“** klarer strukturiert. Version **1.4.1** verbessert zusätzlich den Import und die flexible Übernahme von Teilnehmerlisten im Reiter **„Prüfen & Entscheiden“**.
+Seit Version **1.2.1** enthält Bleepling zusätzlich den Reiter **„Titelkarten“**. Seit Version **1.3.0** kommt mit **„Schnitt & Kapitel“** ein weiterer Arbeitsbereich hinzu, mit dem aus vorhandenen Quellvideos zunächst ein Arbeitsvideo gebildet und daraus einzelne Clips für den weiteren Prüf-Workflow erzeugt werden können. Mit Version **1.4.0** wurde insbesondere der Titelkarten-Reiter deutlich ausgebaut und der Reiter **„Einstellungen / Logs“** klarer strukturiert. Version **1.4.1** verbessert zusätzlich den Import und die flexible Übernahme von Teilnehmerlisten im Reiter **„Prüfen & Entscheiden“**. Version **1.5.0** bündelt nun zahlreiche sichtbare Workflow-Verbesserungen bei **Titelkarten**, **Gezielter Nachbearbeitung**, **Medienübersicht**, **Render-Abbruch**, **Button-/Scroll-Verhalten** und **Einstellungen / Logs**.
 
 ## Hauptfunktionen
 
@@ -18,8 +18,10 @@ Seit Version **1.2.1** enthält Bleepling zusätzlich den Reiter **„Titelkarte
 - neuer Reiter **„Schnitt & Kapitel“** zur Bildung eines Arbeitsvideos, zum manuellen Setzen von Schnittmarken und zur Erzeugung einzelner Clips als neue Projektmedien
 - finaler Export gebleepter Video- oder Audiodateien über FFmpeg
 - gezielte Nachbearbeitung bereits erzeugter Medien
+- Vor- und Nachspannbilder mit synchron verlängerter Stille sowie Komma-Unterstützung bei Sekundeneingaben
 - Erstellung von PNG-Titelkarten über den Reiter **„Titelkarten“**
 - zweite Dachzeile / Untertitel sowie mehrzeilige Titelkarten-Layouts mit Live-Vorschau
+- projektweite Medienübersicht mit kategorisierten Dateibeständen und abschnittsbezogenem Öffnen der jeweiligen Ordner
 - Einstellungs- und Log-Bereich für Prüfung, Installation und Fehlersuche
 
 ## Ziel des Projekts
@@ -67,10 +69,10 @@ Diese Komponenten sind **nicht Bestandteil dieses Projekts** und müssen bei Bed
 
 ## Reiter im Überblick
 
-Der Arbeitsstand **1.4.1** verwendet insbesondere diese sichtbaren Reiter:
+Der Arbeitsstand **1.5.0** verwendet insbesondere diese sichtbaren Reiter:
 
 - **Projekt** – Projekt anlegen, laden und verwalten
-- **Medien** – Video- und WAV-Dateien ins Projekt übernehmen
+- **Medien** – Projektmedien importieren und vorhandene Projektdateien strukturiert überblicken
 - **Schnitt & Kapitel** – Quellvideos sortieren, Arbeitsvideo bilden, manuell schneiden und Clips erzeugen
 - **Prüfen & Entscheiden** – Vorbereitung, Namenslisten, Kandidatenprüfung, Audio-Feinprüfung, Bleep-Parameter und Times-Ableitung
 - **Video & Audio / FFmpeg** – finaler Export gebleepter Video- oder Audiodateien
@@ -106,10 +108,14 @@ Unterstützt werden unter anderem:
 - vertikale Positionierung von Dachzeile, zweiter Dachzeile und Titelbox
 - getrennte Farben, Schriftgrößen und Stilumschaltungen für die einzelnen Textebenen
 - mehrzeilige Titel mit automatischer Einpassung in die verfügbare Titelbox
+- Platzhalter für Dachzeilen nur in der Live-Vorschau, nicht im PNG-Export
+- gezieltes Ausblenden von Dachzeile und zweiter Dachzeile
 - Logos links unten und rechts unten
-- Hintergrundbild als Grundlayout
+- Hintergrundbild als Grundlayout mit automatischer Einpassung in das Zielformat
 - Export direkt in den Projektordner `04_output/titlecards`
 - zusätzlicher PNG-Export an einen frei wählbaren Ort
+
+Im Zusammenspiel mit **„Gezielte Nachbearbeitung“** ist wichtig: Vor- und Nachspannbilder werden dort synchron zum eigentlichen Medium zusammengesetzt. Die vorgeschalteten oder angehängten Bildsegmente verlängern intern auch die Audiospur mit stillen Abschnitten, sodass Bild- und Tonlauf des eigentlichen Videos erhalten bleiben.
 
 Für Schriftarten werden **die lokal auf dem jeweiligen Windows-Rechner verfügbaren Systemschriftarten** genutzt. Bleepling liefert **keine eigenen Font-Dateien** mit. Die Prüfung der Nutzungsrechte verwendeter Schriftarten liegt daher beim jeweiligen Anwender.
 
@@ -125,6 +131,8 @@ Bleepling enthält einen eigenen Reiter **„Einstellungen / Logs“**. Dort kan
 - Render-Backend und weitere technische Einstellungen
 
 Der Bereich dient außerdem dazu, Installationshinweise, sichtbare Einrichtungsbefehle und Hilfetexte für typische Diagnosefälle bereitzustellen oder deren Ausführung lokal vorzubereiten.
+
+Die sichtbare Prüfaktion läuft im aktuellen Stand über einen einzigen klaren Button **„Prüfung ausführen“**. Wenn eine Kontrolle nach Änderungen erneut nötig ist, wird dieselbe Prüfung einfach noch einmal über denselben Button gestartet.
 
 Wichtig ist dabei: Externe Komponenten wie **FFmpeg**, **VLC/libVLC**, **CUDA** oder **cuDNN** werden durch Bleepling nicht mitgeliefert. Die Anwendung prüft nur deren Vorhandensein und unterstützt bei der Einrichtung.
 
@@ -254,7 +262,7 @@ Im Reiter **„Prüfen & Entscheiden“** können importierte Teilnehmerlisten w
 
 ## Projektstruktur
 
-Im Projektstand 1.4.1 werden unter anderem diese projektbezogenen Pfade verwendet:
+Im Projektstand 1.5.0 werden unter anderem diese projektbezogenen Pfade verwendet:
 
 - `01_input/video`
 - `03_processing/04_cutting/working_video`

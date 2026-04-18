@@ -14,7 +14,6 @@ from bleepling.services.render_service import (
     find_ffmpeg,
     find_ffprobe,
     parse_progress_line,
-    run_simple_command,
 )
 from bleepling.services.time_service import parse_time_point, parse_times_line
 
@@ -123,9 +122,11 @@ class FFmpegTab(ttk.Frame):
         self.proc = None
         self.progress_win = None
         self.progress_img = None
+        self.progress_bar = None
         self.progress_var = tk.DoubleVar(value=0.0)
         self.progress_text_var = tk.StringVar(value="")
         self.render_queue = queue.Queue()
+        self.cancel_requested = threading.Event()
         self.media_info = {}
         self._build()
 
@@ -603,6 +604,7 @@ class FFmpegTab(ttk.Frame):
     def _show_progress_window(self):
         if self.progress_win is not None:
             return
+        self.cancel_requested.clear()
         win = tk.Toplevel(self); win.title("Bleepling rendert"); win.transient(self.winfo_toplevel())
         try: win.attributes("-topmost", True)
         except Exception: pass
@@ -615,7 +617,8 @@ class FFmpegTab(ttk.Frame):
             ttk.Label(frame, text="🐤", font=("Segoe UI Emoji", 36)).pack(pady=(0, 10))
         ttk.Label(frame, text="Bleepling rendert gerade… bitte warten", justify="center").pack(pady=(0, 10))
         self.progress_var.set(0.0); self.progress_text_var.set("0 %")
-        ttk.Progressbar(frame, variable=self.progress_var, maximum=100, length=360, mode="determinate").pack(pady=(0, 6))
+        self.progress_bar = ttk.Progressbar(frame, variable=self.progress_var, maximum=100, length=360, mode="determinate")
+        self.progress_bar.pack(pady=(0, 6))
         ttk.Label(frame, textvariable=self.progress_text_var).pack()
         ttk.Button(frame, text="Rendern abbrechen", command=self.cancel_render, style="Accent.TButton").pack(pady=(12, 0))
         win.update_idletasks(); root = self.winfo_toplevel(); rx, ry, rw, rh = root.winfo_rootx(), root.winfo_rooty(), root.winfo_width(), root.winfo_height(); ww, wh = win.winfo_width(), win.winfo_height(); win.geometry(f"+{rx + max(0, (rw-ww)//2)}+{ry + max(0, (rh-wh)//2)}")
@@ -623,39 +626,69 @@ class FFmpegTab(ttk.Frame):
         try: self.app.set_running(True)
         except Exception: pass
 
+    def _set_progress_indeterminate(self, enabled: bool):
+        if self.progress_bar is None:
+            return
+        try:
+            current_mode = str(self.progress_bar.cget("mode"))
+            target_mode = "indeterminate" if enabled else "determinate"
+            if current_mode != target_mode:
+                if current_mode == "indeterminate":
+                    self.progress_bar.stop()
+                self.progress_bar.configure(mode=target_mode)
+            if enabled:
+                self.progress_bar.start(12)
+            else:
+                self.progress_bar.stop()
+        except Exception:
+            pass
+
     def _hide_progress_window(self):
         try:
+            if self.progress_bar is not None:
+                self.progress_bar.stop()
             if self.progress_win is not None:
                 self.progress_win.destroy()
         except Exception:
             pass
         self.progress_win = None
+        self.progress_bar = None
+        self.proc = None
+        self.cancel_requested.clear()
         try: self.app.set_running(False)
         except Exception: pass
 
     def cancel_render(self):
+        self.cancel_requested.set()
         try:
             if self.proc and self.proc.poll() is None:
                 self.proc.terminate(); self._set_status("Renderprozess wurde abgebrochen.")
         except Exception:
             pass
 
+    def _run_simple_cmd(self, cmd):
+        self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+        stdout, stderr = self.proc.communicate()
+        rc = self.proc.returncode
+        self.proc = None
+        return subprocess.CompletedProcess(cmd, rc, stdout=stdout, stderr=stderr)
+
     def _poll_render_queue(self):
         try:
             while True:
                 item = self.render_queue.get_nowait(); kind = item.get("kind")
                 if kind == "progress":
+                    self._set_progress_indeterminate(bool(item.get("indeterminate")))
                     pct = max(0.0, min(100.0, item.get("percent", 0.0))); self.progress_var.set(pct); self.progress_text_var.set(item.get("label", f"{pct:.1f} %")); self.update_idletasks()
                 elif kind == "done":
                     self._hide_progress_window(); self._set_status(item.get("message", "Rendern abgeschlossen.")); return
+                elif kind == "cancelled":
+                    self._hide_progress_window(); self._set_status(item.get("message", "Rendern wurde abgebrochen.")); return
                 elif kind == "error":
                     self._hide_progress_window(); self._set_status(item.get("message", "Rendern fehlgeschlagen.")); return
         except queue.Empty:
             pass
         if self.progress_win is not None: self.after(150, self._poll_render_queue)
-
-    def _run_simple_cmd(self, cmd):
-        return run_simple_command(cmd)
 
     def _run_video_progress_cmd(self, cmd, duration, stage_name):
         self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
@@ -688,11 +721,14 @@ class FFmpegTab(ttk.Frame):
         try:
             ffmpeg = self._ffmpeg(); out_dir = out.parent; out_dir.mkdir(parents=True, exist_ok=True)
             audio_filter, count, interval_mode = self._audio_filter_from_times(times); temp_audio = out_dir / (out.stem + ".tmp_bleep.wav")
-            self.render_queue.put({"kind":"progress","percent":2.0,"label":f"Schritt 1/2: Audio wird gebleept ({count} Bleep(s), {'Intervall-Times' if interval_mode else 'Punkt-Times'})"})
+            self.render_queue.put({"kind":"progress","percent":2.0,"label":f"Schritt 1/2: Audio wird gebleept ({count} Bleep(s), {'Intervall-Times' if interval_mode else 'Punkt-Times'})","indeterminate":True})
             cmd1 = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(media), "-filter_complex", audio_filter, "-map", "[aout]", "-c:a", "pcm_s16le", str(temp_audio)]
             res1 = self._run_simple_cmd(cmd1)
-            if res1.returncode != 0: raise RuntimeError((res1.stderr or res1.stdout or "Fehler in Schritt 1")[:5000])
-            self.render_queue.put({"kind":"progress","percent":15.0,"label":f"Schritt 1/2 abgeschlossen | {_fmt_mb(temp_audio.stat().st_size if temp_audio.exists() else 0)}"})
+            if self.cancel_requested.is_set():
+                raise RuntimeError("__cancelled__")
+            if res1.returncode != 0:
+                raise RuntimeError((res1.stderr or res1.stdout or "Fehler in Schritt 1")[:5000])
+            self.render_queue.put({"kind":"progress","percent":15.0,"label":f"Schritt 1/2 abgeschlossen | {_fmt_mb(temp_audio.stat().st_size if temp_audio.exists() else 0)}","indeterminate":False})
             duration = (self.media_info or {}).get("duration",0.0)
             cmd2 = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-progress", "pipe:1", "-nostats", "-i", str(media), "-i", str(temp_audio), "-map", "0:v:0", "-map", "1:a:0"]
             scale = SCALE_OPTIONS.get(self.scale_display.get(), "1280:-2")
@@ -701,28 +737,54 @@ class FFmpegTab(ttk.Frame):
             if self.faststart_var.get(): cmd2 += ["-movflags", "+faststart"]
             cmd2 += [str(out)]
             rc2, err2 = self._run_video_progress_cmd(cmd2, duration, "Schritt 2/2: Video wird mit fertiger Audiospur erzeugt")
+            if self.cancel_requested.is_set():
+                raise RuntimeError("__cancelled__")
             if rc2 != 0: raise RuntimeError((err2 or "Fehler in Schritt 2")[:5000])
             try:
                 if temp_audio.exists(): temp_audio.unlink()
             except Exception: pass
             self.render_queue.put({"kind":"done","message":f"Gebleeptes Video erzeugt: {out.name}\nAusgabeordner: {out_dir}"})
         except Exception as e:
-            self.proc = None; self.render_queue.put({"kind":"error","message":f"Rendern fehlgeschlagen: {e}"})
+            try:
+                if temp_audio.exists(): temp_audio.unlink()
+            except Exception:
+                pass
+            try:
+                if out.exists() and self.cancel_requested.is_set():
+                    out.unlink()
+            except Exception:
+                pass
+            self.proc = None
+            if str(e) == "__cancelled__":
+                self.render_queue.put({"kind":"cancelled","message":"Rendern wurde abgebrochen."})
+            else:
+                self.render_queue.put({"kind":"error","message":f"Rendern fehlgeschlagen: {e}"})
 
     def _render_worker_audio(self, media, times, out):
         try:
             ffmpeg = self._ffmpeg(); out.parent.mkdir(parents=True, exist_ok=True)
             audio_filter, count, interval_mode = self._audio_filter_from_times(times)
-            self.render_queue.put({"kind":"progress","percent":5.0,"label":f"Audio wird gebleept ({count} Bleep(s), {'Intervall-Times' if interval_mode else 'Punkt-Times'})"})
+            self.render_queue.put({"kind":"progress","percent":5.0,"label":f"Audio wird gebleept ({count} Bleep(s), {'Intervall-Times' if interval_mode else 'Punkt-Times'})","indeterminate":True})
             cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(media), "-filter_complex", audio_filter, "-map", "[aout]"]
             if AUDIO_CODEC_OPTIONS.get(self.audio_codec_display.get(), "aac") == "mp3": cmd += ["-c:a", "libmp3lame", "-b:a", self.audio_bitrate_var.get()]
             else: cmd += ["-c:a", "aac", "-b:a", self.audio_bitrate_var.get()]
             cmd += [str(out)]
             res = self._run_simple_cmd(cmd)
+            if self.cancel_requested.is_set():
+                raise RuntimeError("__cancelled__")
             if res.returncode != 0: raise RuntimeError((res.stderr or res.stdout or "Fehler beim Audioexport")[:5000])
             self.render_queue.put({"kind":"done","message":f"Gebleeptes Audio erzeugt: {out.name}\nAusgabeordner: {out.parent}"})
         except Exception as e:
-            self.proc = None; self.render_queue.put({"kind":"error","message":f"Audioexport fehlgeschlagen: {e}"})
+            try:
+                if out.exists() and self.cancel_requested.is_set():
+                    out.unlink()
+            except Exception:
+                pass
+            self.proc = None
+            if str(e) == "__cancelled__":
+                self.render_queue.put({"kind":"cancelled","message":"Audioexport wurde abgebrochen."})
+            else:
+                self.render_queue.put({"kind":"error","message":f"Audioexport fehlgeschlagen: {e}"})
 
     def run_render_video(self):
         try:

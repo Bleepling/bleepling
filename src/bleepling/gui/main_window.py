@@ -1,4 +1,5 @@
 from __future__ import annotations
+import ctypes
 import json
 import tkinter as tk
 from pathlib import Path
@@ -21,7 +22,29 @@ class BleeplingApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Bleepling – names out, privacy in")
-        self.geometry("1860x1300")
+        default_width = 1860
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        usable_y = 0
+        usable_height = screen_height
+        try:
+            class RECT(ctypes.Structure):
+                _fields_ = [
+                    ("left", ctypes.c_long),
+                    ("top", ctypes.c_long),
+                    ("right", ctypes.c_long),
+                    ("bottom", ctypes.c_long),
+                ]
+
+            rect = RECT()
+            if ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(rect), 0):
+                usable_y = max(0, int(rect.top))
+                usable_height = max(860, int(rect.bottom - rect.top) - 48)
+        except Exception:
+            pass
+        width = min(default_width, screen_width)
+        x = max(0, (screen_width - width) // 2)
+        self.geometry(f"{width}x{usable_height}+{x}+{usable_y}")
         self.minsize(1200, 860)
         self.project = None
         self.logo_img = None
@@ -88,6 +111,10 @@ class BleeplingApp(tk.Tk):
     def _build(self):
         self.load_ui_prefs()
         self.style = ttk.Style(self)
+        self.bind_all("<MouseWheel>", self._on_global_mousewheel, add="+")
+        self.bind_all("<Shift-MouseWheel>", self._on_global_shift_mousewheel, add="+")
+        self.bind_all("<Button-4>", self._on_global_mousewheel_linux, add="+")
+        self.bind_all("<Button-5>", self._on_global_mousewheel_linux, add="+")
 
         self.header = ttk.Frame(self, height=90)
         self.header.pack(fill="x", padx=10, pady=(6, 2))
@@ -187,6 +214,110 @@ class BleeplingApp(tk.Tk):
     def set_status(self, msg):
         self.status.set(msg)
 
+    def _find_scroll_target(self, widget, horizontal: bool = False):
+        axis_method = "xview_scroll" if horizontal else "yview_scroll"
+        while widget is not None:
+            cls = widget.winfo_class()
+            if hasattr(widget, axis_method) and cls in {"Text", "Canvas", "Listbox", "Treeview"}:
+                return widget
+            widget = getattr(widget, "master", None)
+        return None
+
+    def _scroll_widget(self, widget, delta_units: int, horizontal: bool = False):
+        if widget is None or delta_units == 0:
+            return
+        try:
+            if horizontal:
+                widget.xview_scroll(delta_units, "units")
+            else:
+                widget.yview_scroll(delta_units, "units")
+        except Exception:
+            pass
+
+    def _widget_under_pointer(self):
+        try:
+            return self.winfo_containing(self.winfo_pointerx(), self.winfo_pointery())
+        except Exception:
+            return None
+
+    def _on_global_mousewheel(self, event):
+        widget = self._find_scroll_target(getattr(event, "widget", None) or self._widget_under_pointer(), horizontal=False)
+        if widget is None:
+            return
+        delta = getattr(event, "delta", 0)
+        units = -int(delta / 120) if delta else 0
+        if units == 0 and delta:
+            units = -1 if delta > 0 else 1
+        self._scroll_widget(widget, units, horizontal=False)
+        return "break"
+
+    def _on_global_shift_mousewheel(self, event):
+        widget = self._find_scroll_target(getattr(event, "widget", None) or self._widget_under_pointer(), horizontal=True)
+        if widget is None:
+            return
+        delta = getattr(event, "delta", 0)
+        units = -int(delta / 120) if delta else 0
+        if units == 0 and delta:
+            units = -1 if delta > 0 else 1
+        self._scroll_widget(widget, units, horizontal=True)
+        return "break"
+
+    def _on_global_mousewheel_linux(self, event):
+        widget = self._find_scroll_target(getattr(event, "widget", None) or self._widget_under_pointer(), horizontal=False)
+        if widget is None:
+            return
+        num = getattr(event, "num", None)
+        units = -1 if num == 4 else 1 if num == 5 else 0
+        self._scroll_widget(widget, units, horizontal=False)
+        return "break"
+
+    def _is_danger_button(self, widget) -> bool:
+        try:
+            bg = str(widget.cget("bg")).lower()
+        except Exception:
+            bg = ""
+        return bg in {"#c62828", "#b71c1c", "#b94a48", "#a53f3d", "#c85b57"}
+
+    def _style_classic_button(self, widget):
+        is_danger = self._is_danger_button(widget)
+        normal_bg = "#c62828" if is_danger else self.btn_bg
+        hover_bg = "#b71c1c" if is_danger else self.btn_active
+        normal_fg = "white" if is_danger else self.fg
+        hover_fg = "white"
+        try:
+            widget.configure(
+                bg=normal_bg,
+                fg=normal_fg,
+                activebackground=hover_bg,
+                activeforeground=hover_fg,
+                highlightbackground=self.border,
+                highlightcolor=self.border,
+                disabledforeground=self.disabled_fg,
+                relief="raised",
+                bd=1,
+                cursor="hand2",
+            )
+        except Exception:
+            return
+
+        def _enter(_event):
+            try:
+                widget.configure(bg=hover_bg, fg=hover_fg)
+            except Exception:
+                pass
+
+        def _leave(_event):
+            try:
+                widget.configure(bg=normal_bg, fg=normal_fg)
+            except Exception:
+                pass
+
+        try:
+            widget.bind("<Enter>", _enter, add="+")
+            widget.bind("<Leave>", _leave, add="+")
+        except Exception:
+            pass
+
     def save_project(self):
         if not self.project:
             self.set_status("Kein Projekt geladen.")
@@ -285,6 +416,8 @@ class BleeplingApp(tk.Tk):
         self.btn_bg = btn_bg
         self.btn_active = btn_active
         self.fg = fg
+        self.border = border
+        self.disabled_fg = disabled_fg
 
         self.configure(bg=bg)
         self.style.theme_use("clam")
@@ -301,13 +434,13 @@ class BleeplingApp(tk.Tk):
             foreground=[("selected", fg)],
         )
 
-        self.style.configure("TButton", background=btn_bg, foreground=fg, bordercolor=border)
+        self.style.configure("TButton", background=btn_bg, foreground=fg, bordercolor=border, relief="solid")
         self.style.map(
             "TButton",
             background=[("active", btn_active), ("pressed", btn_active)],
             foreground=[("active", "white")],
         )
-        self.style.configure("Accent.TButton", background=btn_bg, foreground=fg, bordercolor=border)
+        self.style.configure("Accent.TButton", background=btn_bg, foreground=fg, bordercolor=border, relief="solid")
         self.style.map(
             "Accent.TButton",
             background=[("active", btn_active), ("pressed", btn_active)],
@@ -360,6 +493,8 @@ class BleeplingApp(tk.Tk):
                             highlightbackground=border,
                             highlightcolor=border,
                         )
+                    elif cls == "Button":
+                        self._style_classic_button(child)
                 except Exception:
                     pass
                 apply_to_children(child)

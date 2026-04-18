@@ -3,12 +3,19 @@ from tkinter import ttk, filedialog, simpledialog, messagebox
 from pathlib import Path
 from bleepling.services.project_service import ProjectService
 
+try:
+    from PIL import Image, ImageTk
+except Exception:
+    Image = None
+    ImageTk = None
+
 
 class ProjectTab(ttk.Frame):
     def __init__(self, master, app):
         super().__init__(master)
         self.app = app
         self.project_service = ProjectService()
+        self.project_bird_img = None
 
         top = ttk.Frame(self)
         top.pack(fill="x", padx=12, pady=12)
@@ -25,7 +32,28 @@ class ProjectTab(ttk.Frame):
         )
         ttk.Label(self, text=info).pack(anchor="w", padx=12, pady=(0, 12))
 
+        bird_wrap = ttk.Frame(self)
+        bird_wrap.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        bird_wrap.columnconfigure(0, weight=1)
+        bird_wrap.rowconfigure(0, weight=1)
+        self.bird_label = ttk.Label(bird_wrap, anchor="center")
+        self.bird_label.grid(row=0, column=0, sticky="nsew")
+        self._refresh_bird()
+
+    def _asset(self, name: str) -> Path:
+        return Path(__file__).resolve().parents[3] / "assets" / name
+
+    def _refresh_bird(self):
+        bird_path = self._asset("vogel1_light_512.png")
+        if Image is not None and ImageTk is not None and bird_path.exists():
+            img = Image.open(bird_path).resize((420, 420))
+            self.project_bird_img = ImageTk.PhotoImage(img)
+            self.bird_label.configure(image=self.project_bird_img, text="")
+        else:
+            self.bird_label.configure(image="", text="🐤")
+
     def refresh(self):
+        self._refresh_bird()
         if self.app.project:
             try:
                 self.label.config(text=f"Projekt geladen: {self.app.project.root_path}")

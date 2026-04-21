@@ -23,6 +23,7 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] Reiter `Titelkarten` ist weiterhin in Code, Doku und Release-Unterlagen konsistent berücksichtigt
 - [ ] zweite Dachzeile sowie die erweiterten Text- und Vorschaufunktionen im Reiter `Titelkarten` sind in Code, Doku und Release-Unterlagen konsistent berücksichtigt
 - [ ] Reiter `Einstellungen / Logs` ist in Beschriftung, Hilfe und sichtbaren Einrichtungsbefehlen konsistent dokumentiert
+- [ ] neue 1.5.1-Funktionen für Projektlöschung, Titelkarten-Sicherheitsabfrage, interaktive Titelkarten-Positionierung und zentrale Render-Parameter sind in Code, Doku und Release-Unterlagen konsistent berücksichtigt
 
 ## 3. Aufräumen vor Veröffentlichung
 
@@ -69,6 +70,12 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] Clip-Erzeugung aus dem Schnittfenster funktioniert
 - [ ] Reiter `Titelkarten` startet und speichert ohne Fehlermeldung
 - [ ] Dachzeile, zweite Dachzeile und mehrzeiliger Titel werden in Vorschau und PNG-Export konsistent dargestellt
+- [ ] interaktive Layoutfelder im Reiter `Titelkarten` lassen sich verschieben, skalieren und mittig einrasten
+- [ ] exportierte Titelkarten enthalten keine grauen Vorschauflächen, Hilfsrahmen oder Platzhalterlinien
+- [ ] Sicherheitsabfrage beim Überschreiben bestehender Titelkarten im Projektordner funktioniert
+- [ ] Projektlöschung funktioniert nur nach Prüfung eines vollständigen Bleepling-Projekts und nur nach Sicherheitsabfrage
+- [ ] Rechtsklick-Kontextmenüs funktionieren in den relevanten Eingabefeldern
+- [ ] zentrale Render-Parameter unter `Einstellungen / Logs` werden gespeichert und von `Gezielte Nachbearbeitung` übernommen
 - [ ] bestehende ältere Projekte lassen sich trotz neuer Titelkarten- und Schnitt-Struktur laden
 - [ ] Export nach `04_output/titlecards` funktioniert
 - [ ] freier PNG-Export funktioniert
@@ -87,7 +94,10 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] Funktion `Titelkarten` ist weiterhin in README, Changelog und Benutzerdokumentation konsistent beschrieben
 - [ ] zweite Dachzeile / Untertitel und die verfeinerte Titelkarten-Vorschau sind in README, Changelog und Benutzerdokumentation konsistent beschrieben
 - [ ] aktuelle Trennung von Platzhalter-Vorschau und PNG-Export im Reiter `Titelkarten` ist in README, Changelog und Benutzerdokumentation konsistent beschrieben
+- [ ] interaktive Titelkarten-Positionierung, Skalierung und mittiges Einrasten sind in README, Changelog und Benutzerdokumentation konsistent beschrieben
 - [ ] Reiter `Gezielte Nachbearbeitung` ist mit synchronen Vor-/Nachspannbildern, Komma-Eingaben und Output-Buttons konsistent dokumentiert
+- [ ] zentrale Render-Parameter und deren Auswirkungen auf gezielte Nachbearbeitung sind in README, Changelog und Benutzerdokumentation konsistent beschrieben
+- [ ] Projektlöschung und Sicherheitsabfragen sind in README, Changelog und Benutzerdokumentation konsistent beschrieben
 - [ ] Reiter `Medien` ist mit seiner erweiterten Projektübersicht und den abschnittsbezogenen Ordner-Buttons konsistent dokumentiert
 - [ ] Bereich `Einstellungen / Logs` ist mit seiner aktuellen Struktur in README, Changelog und Benutzerdokumentation konsistent beschrieben
 
@@ -110,6 +120,7 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] Release-Notiz für 1.5.0 erwähnt die überarbeitete Medienübersicht
 - [ ] Release-Notiz für 1.5.0 erwähnt die sichtbaren Verbesserungen in `Titelkarten` und `Gezielte Nachbearbeitung`
 - [ ] Release-Notiz für 1.5.0 erwähnt die wirksame Abbruchlogik bei längeren Renderläufen
+- [ ] Release-Notiz für 1.5.1 erwähnt interaktive Titelkartenfelder, zentrale Render-Parameter und sichere Projekt-/Exportdialoge
 - [ ] Release-Notiz erwähnt weiterhin den Reiter `Schnitt & Kapitel`, soweit dies für die Gesamteinordnung des aktuellen Funktionsstands sinnvoll ist
 
 ## Notiz

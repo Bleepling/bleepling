@@ -92,6 +92,16 @@ class BleeplingApp(tk.Tk):
             pass
         return None
 
+    def forget_recent_project(self, project_path: Path):
+        try:
+            data = self._read_state()
+            last = data.get("last_project")
+            if last and Path(last).resolve() == Path(project_path).resolve():
+                data.pop("last_project", None)
+                self._state_file().write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
     def save_ui_prefs(self, theme: str | None = None, ui_scale: str | None = None):
         try:
             data = self._read_state()
@@ -115,6 +125,7 @@ class BleeplingApp(tk.Tk):
         self.bind_all("<Shift-MouseWheel>", self._on_global_shift_mousewheel, add="+")
         self.bind_all("<Button-4>", self._on_global_mousewheel_linux, add="+")
         self.bind_all("<Button-5>", self._on_global_mousewheel_linux, add="+")
+        self.bind_all("<Button-3>", self._on_text_context_menu, add="+")
 
         self.header = ttk.Frame(self, height=90)
         self.header.pack(fill="x", padx=10, pady=(6, 2))
@@ -214,9 +225,108 @@ class BleeplingApp(tk.Tk):
     def set_status(self, msg):
         self.status.set(msg)
 
+    def _resolve_widget(self, widget):
+        if isinstance(widget, str):
+            try:
+                return self.nametowidget(widget)
+            except Exception:
+                return None
+        return widget
+
+    def _is_text_context_widget(self, widget) -> bool:
+        widget = self._resolve_widget(widget)
+        if widget is None or not hasattr(widget, "winfo_class"):
+            return False
+        try:
+            cls = widget.winfo_class()
+        except Exception:
+            return False
+        return cls in {"Entry", "TEntry", "Text", "Spinbox", "TSpinbox", "Combobox", "TCombobox"}
+
+    def _widget_state_value(self, widget) -> str:
+        try:
+            return str(widget.cget("state"))
+        except Exception:
+            return "normal"
+
+    def _widget_has_selection(self, widget) -> bool:
+        try:
+            if widget.winfo_class() == "Text":
+                return bool(widget.tag_ranges("sel"))
+            return bool(widget.selection_present())
+        except Exception:
+            return False
+
+    def _clipboard_has_text(self) -> bool:
+        try:
+            self.clipboard_get()
+            return True
+        except Exception:
+            return False
+
+    def _place_insert_at_pointer(self, widget, event):
+        try:
+            cls = widget.winfo_class()
+            if cls == "Text":
+                widget.mark_set("insert", f"@{event.x},{event.y}")
+            elif cls in {"Entry", "TEntry", "Spinbox", "TSpinbox", "Combobox", "TCombobox"}:
+                widget.icursor(f"@{event.x}")
+        except Exception:
+            pass
+
+    def _on_text_context_menu(self, event):
+        widget = self._resolve_widget(getattr(event, "widget", None))
+        if not self._is_text_context_widget(widget):
+            return
+
+        try:
+            widget.focus_set()
+        except Exception:
+            pass
+        if not self._widget_has_selection(widget):
+            self._place_insert_at_pointer(widget, event)
+
+        state = self._widget_state_value(widget)
+        can_edit = state not in {"disabled", "readonly"}
+        has_selection = self._widget_has_selection(widget)
+        has_clipboard = self._clipboard_has_text()
+
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(
+            label="Ausschneiden",
+            command=lambda: widget.event_generate("<<Cut>>"),
+            state="normal" if can_edit and has_selection else "disabled",
+        )
+        menu.add_command(
+            label="Kopieren",
+            command=lambda: widget.event_generate("<<Copy>>"),
+            state="normal" if has_selection else "disabled",
+        )
+        menu.add_command(
+            label="Einfügen",
+            command=lambda: widget.event_generate("<<Paste>>"),
+            state="normal" if can_edit and has_clipboard else "disabled",
+        )
+        menu.add_separator()
+        menu.add_command(label="Alles auswählen", command=lambda: widget.event_generate("<<SelectAll>>"))
+
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            try:
+                menu.grab_release()
+            except Exception:
+                pass
+        return "break"
+
     def _find_scroll_target(self, widget, horizontal: bool = False):
         axis_method = "xview_scroll" if horizontal else "yview_scroll"
         while widget is not None:
+            widget = self._resolve_widget(widget)
+            if widget is None:
+                return None
+            if not hasattr(widget, "winfo_class"):
+                return None
             cls = widget.winfo_class()
             if hasattr(widget, axis_method) and cls in {"Text", "Canvas", "Listbox", "Treeview"}:
                 return widget

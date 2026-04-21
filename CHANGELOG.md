@@ -4,6 +4,31 @@ Alle nennenswerten Änderungen an **Bleepling** sollen in dieser Datei dokumenti
 
 Die Struktur orientiert sich an einer einfachen, für Open-Source-Projekte gut lesbaren Versionshistorie.
 
+## [1.5.1] - 2026-04-21
+
+### Hinzugefügt
+- rechter Mausklick mit Kontextmenü für Eingabefelder, Textfelder, Spinboxen und Comboboxen in allen Reitern
+- Sicherheitsabfrage beim Export von Titelkarten in den Projektordner, wenn eine Datei mit gleichem Namen bereits existiert
+- vogelgestützte Bestätigungsdialoge für kritische Aktionen wie Überschreiben von Titelkarten und Löschen von Projekten
+- Button **„Bestehendes Projekt löschen“** im Reiter **„Projekt“**, bewusst rechts am Fensterrand positioniert
+- interaktive Layout-Bearbeitung im Reiter **„Titelkarten“**: Dachzeile, zweite Dachzeile, Titelbox sowie beide Logo-Felder lassen sich in der Live-Vorschau verschieben und skalieren
+- mittige Einrastfunktion mit sichtbaren Hilfslinien für Titelkarten-Layoutfelder
+- zentrale Render-Einstellungen im Reiter **„Einstellungen / Logs“** unter **„Rendern / Ausgabe“** mit Backend, Qualität, Preset, Audio-Bitrate und Skalierung
+- erklärende Fragezeichen-Hilfen zu allen neuen Render-Parametern
+
+### Geändert
+- die gezielte Nachbearbeitung übernimmt Codec, Qualität, Preset, Audio-Bitrate und Skalierung aus den zentralen Render-Einstellungen
+- Standard für die gezielte Nachbearbeitung bleibt **Originalgröße beibehalten**, damit vorhandene Videos nicht unbemerkt herunterskaliert werden
+- die echte Titelkarten-Ausgabe ist jetzt strikt von der Bearbeitungsansicht getrennt: Hilfsrahmen, Platzhalter und graue Vorschauflächen bleiben ausschließlich in der Live-Vorschau
+- der Reiter **„Titelkarten“** speichert zusätzliche Layoutdaten für X-Positionen, Breiten und Höhen der interaktiven Felder
+- globale Mausrad-Behandlung ist robuster gegenüber Tkinter-Combobox-Dropdowns, die Widgetpfade als String liefern
+
+### Behoben
+- Fehlermeldung beim Scrollen geöffneter Combobox-Dropdowns mit dem Mausrad
+- versehentliches Überschreiben bestehender Titelkarten im Projektordner ohne Nachfrage
+- fehlende Möglichkeit, vollständige bestehende Projektordner über die Oberfläche zu löschen
+- graue Vorschauhintergründe und Hilfsrahmen konnten in exportierten oder nachträglich gerenderten Titelkarten sichtbar werden
+
 ## [1.5.0] - 2026-04-18
 
 ### Hinzugefügt

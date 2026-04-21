@@ -266,6 +266,11 @@ class TitleCardsTab(ttk.Frame):
         self.partner_logo = None
         self.partner_logo_path = ""
         self.preview_photo = None
+        self._preview_scale = 1.0
+        self._preview_origin = (0, 0)
+        self._preview_drag = None
+        self._selected_layout_item = None
+        self._snap_guides = []
 
         self.font_names, self.font_file_index = build_font_catalog(self.winfo_toplevel())
         default_font = "Arial" if "Arial" in self.font_names else (self.font_names[0] if self.font_names else "TkDefaultFont")
@@ -281,6 +286,13 @@ class TitleCardsTab(ttk.Frame):
         self.subtitle_size_var = tk.IntVar(value=52)
         self.header_y_var = tk.IntVar(value=130)
         self.subtitle_y_var = tk.IntVar(value=220)
+        self.header_x_var = tk.IntVar(value=420)
+        self.header_w_var = tk.IntVar(value=1080)
+        self.header_h_var = tk.IntVar(value=66)
+        self.subtitle_x_var = tk.IntVar(value=380)
+        self.subtitle_w_var = tk.IntVar(value=1160)
+        self.subtitle_h_var = tk.IntVar(value=76)
+        self.title_box_x_var = tk.IntVar(value=390)
         self.title_box_y_var = tk.IntVar(value=360)
         self.title_box_width_var = tk.IntVar(value=1140)
         self.title_box_height_var = tk.IntVar(value=320)
@@ -299,6 +311,14 @@ class TitleCardsTab(ttk.Frame):
         self.subtitle_hidden_var = tk.BooleanVar(value=False)
         self.bold_var = tk.BooleanVar(value=False)
         self.italic_var = tk.BooleanVar(value=False)
+        self.left_logo_x_var = tk.IntVar(value=110)
+        self.left_logo_y_var = tk.IntVar(value=860)
+        self.left_logo_w_var = tk.IntVar(value=760)
+        self.left_logo_h_var = tk.IntVar(value=150)
+        self.partner_logo_x_var = tk.IntVar(value=1390)
+        self.partner_logo_y_var = tk.IntVar(value=835)
+        self.partner_logo_w_var = tk.IntVar(value=360)
+        self.partner_logo_h_var = tk.IntVar(value=165)
         self.export_name_var = tk.StringVar(value="titelkarte.png")
         self.status_var = tk.StringVar(value="Bereit.")
 
@@ -412,6 +432,9 @@ class TitleCardsTab(ttk.Frame):
         self.preview_canvas = tk.Canvas(right_wrap, highlightthickness=0, background="#f3f4f6")
         self.preview_canvas.grid(row=1, column=0, sticky="nsew")
         self.preview_canvas.bind("<Configure>", lambda _e: self._request_preview_update())
+        self.preview_canvas.bind("<Button-1>", self._on_preview_mouse_down)
+        self.preview_canvas.bind("<B1-Motion>", self._on_preview_mouse_drag)
+        self.preview_canvas.bind("<ButtonRelease-1>", self._on_preview_mouse_up)
         ttk.Label(
             right_wrap,
             text="Es werden die lokal verfügbaren Systemschriftarten des jeweiligen Rechners angeboten. Schriftlizenzen sind vom Anwender selbst zu prüfen.",
@@ -429,6 +452,13 @@ class TitleCardsTab(ttk.Frame):
             self.subtitle_size_var,
             self.header_y_var,
             self.subtitle_y_var,
+            self.header_x_var,
+            self.header_w_var,
+            self.header_h_var,
+            self.subtitle_x_var,
+            self.subtitle_w_var,
+            self.subtitle_h_var,
+            self.title_box_x_var,
             self.title_box_y_var,
             self.title_box_width_var,
             self.title_box_height_var,
@@ -449,6 +479,14 @@ class TitleCardsTab(ttk.Frame):
             self.use_background_var,
             self.show_footer_var,
             self.show_title_box_var,
+            self.left_logo_x_var,
+            self.left_logo_y_var,
+            self.left_logo_w_var,
+            self.left_logo_h_var,
+            self.partner_logo_x_var,
+            self.partner_logo_y_var,
+            self.partner_logo_w_var,
+            self.partner_logo_h_var,
         ):
             var.trace_add("write", lambda *_: self._request_preview_update())
 
@@ -536,6 +574,13 @@ class TitleCardsTab(ttk.Frame):
             self.subtitle_size_var.set(int(data.get("subtitle_size", 52)))
             self.header_y_var.set(int(data.get("header_y", 130)))
             self.subtitle_y_var.set(int(data.get("subtitle_y", 220)))
+            self.header_x_var.set(int(data.get("header_x", 420)))
+            self.header_w_var.set(int(data.get("header_w", 1080)))
+            self.header_h_var.set(int(data.get("header_h", 66)))
+            self.subtitle_x_var.set(int(data.get("subtitle_x", 380)))
+            self.subtitle_w_var.set(int(data.get("subtitle_w", 1160)))
+            self.subtitle_h_var.set(int(data.get("subtitle_h", 76)))
+            self.title_box_x_var.set(int(data.get("title_box_x", (CANVAS_W - int(data.get("title_box_width", 1140))) / 2)))
             self.title_box_y_var.set(int(data.get("title_box_y", 360)))
             self.title_box_width_var.set(int(data.get("title_box_width", 1140)))
             self.title_box_height_var.set(int(data.get("title_box_height", 320)))
@@ -553,6 +598,14 @@ class TitleCardsTab(ttk.Frame):
             self.subtitle_hidden_var.set(bool(data.get("subtitle_hidden", False)))
             self.bold_var.set(bool(data.get("bold", False)))
             self.italic_var.set(bool(data.get("italic", False)))
+            self.left_logo_x_var.set(int(data.get("left_logo_x", 110)))
+            self.left_logo_y_var.set(int(data.get("left_logo_y", 860)))
+            self.left_logo_w_var.set(int(data.get("left_logo_w", 760)))
+            self.left_logo_h_var.set(int(data.get("left_logo_h", 150)))
+            self.partner_logo_x_var.set(int(data.get("partner_logo_x", 1390)))
+            self.partner_logo_y_var.set(int(data.get("partner_logo_y", 835)))
+            self.partner_logo_w_var.set(int(data.get("partner_logo_w", 360)))
+            self.partner_logo_h_var.set(int(data.get("partner_logo_h", 165)))
             self.background_image_path = data.get("background_image_path", "")
             self.left_logo_path = data.get("left_logo_path", "")
             self.partner_logo_path = data.get("partner_logo_path", "")
@@ -587,6 +640,13 @@ class TitleCardsTab(ttk.Frame):
                 "subtitle_size": self.subtitle_size_var.get(),
                 "header_y": self.header_y_var.get(),
                 "subtitle_y": self.subtitle_y_var.get(),
+                "header_x": self.header_x_var.get(),
+                "header_w": self.header_w_var.get(),
+                "header_h": self.header_h_var.get(),
+                "subtitle_x": self.subtitle_x_var.get(),
+                "subtitle_w": self.subtitle_w_var.get(),
+                "subtitle_h": self.subtitle_h_var.get(),
+                "title_box_x": self.title_box_x_var.get(),
                 "title_box_y": self.title_box_y_var.get(),
                 "title_box_width": self.title_box_width_var.get(),
                 "title_box_height": self.title_box_height_var.get(),
@@ -604,6 +664,14 @@ class TitleCardsTab(ttk.Frame):
                 "subtitle_hidden": self.subtitle_hidden_var.get(),
                 "bold": self.bold_var.get(),
                 "italic": self.italic_var.get(),
+                "left_logo_x": self.left_logo_x_var.get(),
+                "left_logo_y": self.left_logo_y_var.get(),
+                "left_logo_w": self.left_logo_w_var.get(),
+                "left_logo_h": self.left_logo_h_var.get(),
+                "partner_logo_x": self.partner_logo_x_var.get(),
+                "partner_logo_y": self.partner_logo_y_var.get(),
+                "partner_logo_w": self.partner_logo_w_var.get(),
+                "partner_logo_h": self.partner_logo_h_var.get(),
                 "background_image_path": self.background_image_path,
                 "left_logo_path": self.left_logo_path,
                 "partner_logo_path": self.partner_logo_path,
@@ -667,17 +735,264 @@ class TitleCardsTab(ttk.Frame):
         th = bbox[3] - bbox[1]
         draw.text((x1 + (x2 - x1 - tw) / 2, y1 + (y2 - y1 - th) / 2), label, fill="#9CA3AF", font=slot_font)
 
+    def _layout_box(self, item: str) -> tuple[int, int, int, int]:
+        if item == "header":
+            x = self.header_x_var.get()
+            y = self.header_y_var.get() - 22
+            w = self.header_w_var.get()
+            h = self.header_h_var.get()
+        elif item == "subtitle":
+            x = self.subtitle_x_var.get()
+            y = self.subtitle_y_var.get() - 24
+            w = self.subtitle_w_var.get()
+            h = self.subtitle_h_var.get()
+        elif item == "title_box":
+            x = self.title_box_x_var.get()
+            y = self.title_box_y_var.get()
+            w = self.title_box_width_var.get()
+            h = self.title_box_height_var.get()
+        elif item == "left_logo":
+            x = self.left_logo_x_var.get()
+            y = self.left_logo_y_var.get()
+            w = self.left_logo_w_var.get()
+            h = self.left_logo_h_var.get()
+        else:
+            x = self.partner_logo_x_var.get()
+            y = self.partner_logo_y_var.get()
+            w = self.partner_logo_w_var.get()
+            h = self.partner_logo_h_var.get()
+        return x, y, x + w, y + h
+
+    def _set_layout_box(self, item: str, x: int, y: int, w: int, h: int):
+        min_sizes = {
+            "header": (120, 32),
+            "subtitle": (120, 36),
+            "title_box": (220, 100),
+            "left_logo": (80, 50),
+            "partner_logo": (80, 50),
+        }
+        min_w, min_h = min_sizes.get(item, (80, 50))
+        w = max(min_w, min(int(w), CANVAS_W))
+        h = max(min_h, min(int(h), CANVAS_H))
+        x = max(0, min(int(x), CANVAS_W - w))
+        y = max(0, min(int(y), CANVAS_H - h))
+        old_suspend = self._suspend_preview_updates
+        self._suspend_preview_updates = True
+        try:
+            if item == "header":
+                self.header_x_var.set(x)
+                self.header_y_var.set(y + 22)
+                self.header_w_var.set(w)
+                self.header_h_var.set(h)
+            elif item == "subtitle":
+                self.subtitle_x_var.set(x)
+                self.subtitle_y_var.set(y + 24)
+                self.subtitle_w_var.set(w)
+                self.subtitle_h_var.set(h)
+            elif item == "title_box":
+                self.title_box_x_var.set(x)
+                self.title_box_y_var.set(y)
+                self.title_box_width_var.set(w)
+                self.title_box_height_var.set(h)
+            elif item == "left_logo":
+                self.left_logo_x_var.set(x)
+                self.left_logo_y_var.set(y)
+                self.left_logo_w_var.set(w)
+                self.left_logo_h_var.set(h)
+            else:
+                self.partner_logo_x_var.set(x)
+                self.partner_logo_y_var.set(y)
+                self.partner_logo_w_var.set(w)
+                self.partner_logo_h_var.set(h)
+        finally:
+            self._suspend_preview_updates = old_suspend
+        self.update_preview()
+
+    def _snap_layout_box(self, x: int, y: int, w: int, h: int) -> tuple[int, int, list[str]]:
+        guides = []
+        snap_distance = 18
+        center_x = x + w / 2
+        center_y = y + h / 2
+        if abs(center_x - CANVAS_W / 2) <= snap_distance:
+            x = int(round((CANVAS_W - w) / 2))
+            guides.append("v")
+        if abs(center_y - CANVAS_H / 2) <= snap_distance:
+            y = int(round((CANVAS_H - h) / 2))
+            guides.append("h")
+        return x, y, guides
+
+    def _preview_to_design(self, x: int, y: int) -> tuple[int, int] | None:
+        ox, oy = self._preview_origin
+        scale = self._preview_scale
+        if scale <= 0:
+            return None
+        dx = (x - ox) / scale
+        dy = (y - oy) / scale
+        if dx < 0 or dy < 0 or dx > CANVAS_W or dy > CANVAS_H:
+            return None
+        return int(round(dx)), int(round(dy))
+
+    def _design_to_preview_box(self, box: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+        ox, oy = self._preview_origin
+        scale = self._preview_scale
+        x1, y1, x2, y2 = box
+        return (
+            int(round(ox + x1 * scale)),
+            int(round(oy + y1 * scale)),
+            int(round(ox + x2 * scale)),
+            int(round(oy + y2 * scale)),
+        )
+
+    def _preview_layout_items(self):
+        items = []
+        if not self.header_hidden_var.get():
+            items.append(("header", "Reihe / Dachzeile"))
+        if not self.subtitle_hidden_var.get():
+            items.append(("subtitle", "Zweite Dachzeile"))
+        if self.show_title_box_var.get():
+            items.append(("title_box", "Titelbox"))
+        if not self.show_footer_var.get() or self.use_background_var.get():
+            return items
+        items.extend(
+            [
+                ("left_logo", "Logo links unten"),
+                ("partner_logo", "Partnerlogo"),
+            ]
+        )
+        return items
+
+    def _hit_preview_layout(self, event):
+        point = self._preview_to_design(event.x, event.y)
+        if point is None:
+            return None
+        px, py = point
+        handle_pad = max(10, int(round(10 / max(self._preview_scale, 0.2))))
+
+        for item, _label in reversed(self._preview_layout_items()):
+            x1, y1, x2, y2 = self._layout_box(item)
+            if x2 - handle_pad <= px <= x2 + handle_pad and y2 - handle_pad <= py <= y2 + handle_pad:
+                return item, "resize", point
+            if x1 <= px <= x2 and y1 <= py <= y2:
+                return item, "move", point
+        return None
+
+    def _draw_preview_layout_handles(self):
+        if self._snap_guides:
+            ox, oy = self._preview_origin
+            scale = self._preview_scale
+            guide_color = "#2563EB"
+            if "v" in self._snap_guides:
+                x = int(round(ox + (CANVAS_W / 2) * scale))
+                self.preview_canvas.create_line(
+                    x,
+                    int(round(oy)),
+                    x,
+                    int(round(oy + CANVAS_H * scale)),
+                    fill=guide_color,
+                    width=2,
+                    dash=(4, 4),
+                )
+            if "h" in self._snap_guides:
+                y = int(round(oy + (CANVAS_H / 2) * scale))
+                self.preview_canvas.create_line(
+                    int(round(ox)),
+                    y,
+                    int(round(ox + CANVAS_W * scale)),
+                    y,
+                    fill=guide_color,
+                    width=2,
+                    dash=(4, 4),
+                )
+
+        for item, label in self._preview_layout_items():
+            box = self._design_to_preview_box(self._layout_box(item))
+            x1, y1, x2, y2 = box
+            selected = item == self._selected_layout_item
+            outline = "#1D4ED8" if selected else "#64748B"
+            width = 3 if selected else 2
+            self.preview_canvas.create_rectangle(x1, y1, x2, y2, outline=outline, width=width, dash=(5, 3))
+            self.preview_canvas.create_text(
+                x1 + 8,
+                y1 + 8,
+                text=label,
+                anchor="nw",
+                fill=outline,
+                font=("Segoe UI", 9, "bold"),
+            )
+            handle = 10 if selected else 8
+            self.preview_canvas.create_rectangle(
+                x2 - handle,
+                y2 - handle,
+                x2 + handle,
+                y2 + handle,
+                fill=outline,
+                outline="#FFFFFF",
+                width=1,
+            )
+
+    def _on_preview_mouse_down(self, event):
+        hit = self._hit_preview_layout(event)
+        if hit is None:
+            self._preview_drag = None
+            self._selected_layout_item = None
+            self.update_preview()
+            return
+        item, mode, point = hit
+        self._selected_layout_item = item
+        self._preview_drag = {
+            "item": item,
+            "mode": mode,
+            "start": point,
+            "box": self._layout_box(item),
+        }
+        self.preview_canvas.configure(cursor="size_nw_se" if mode == "resize" else "fleur")
+        self.update_preview()
+        return "break"
+
+    def _on_preview_mouse_drag(self, event):
+        if not self._preview_drag:
+            return
+        point = self._preview_to_design(event.x, event.y)
+        if point is None:
+            return "break"
+        item = self._preview_drag["item"]
+        mode = self._preview_drag["mode"]
+        sx, sy = self._preview_drag["start"]
+        x1, y1, x2, y2 = self._preview_drag["box"]
+        dx = point[0] - sx
+        dy = point[1] - sy
+        if mode == "move":
+            new_x, new_y = x1 + dx, y1 + dy
+            w, h = x2 - x1, y2 - y1
+            new_x, new_y, self._snap_guides = self._snap_layout_box(new_x, new_y, w, h)
+            self._set_layout_box(item, new_x, new_y, w, h)
+        else:
+            w, h = x2 - x1 + dx, y2 - y1 + dy
+            new_x, new_y, self._snap_guides = self._snap_layout_box(x1, y1, w, h)
+            self._set_layout_box(item, new_x, new_y, w, h)
+        return "break"
+
+    def _on_preview_mouse_up(self, _event):
+        if self._preview_drag:
+            self.status_var.set("Titelkarten-Element aktualisiert.")
+        self._preview_drag = None
+        self._snap_guides = []
+        self.preview_canvas.configure(cursor="")
+        self.update_preview()
+        self.save_state()
+        return "break"
+
     def render_image(self, show_placeholders: bool = True):
-        img = Image.new("RGBA", (CANVAS_W, CANVAS_H), "#F3F4F6")
+        base_bg = "#F3F4F6" if show_placeholders else "#FFFFFF"
+        img = Image.new("RGBA", (CANVAS_W, CANVAS_H), base_bg)
         draw = ImageDraw.Draw(img)
 
-        title_box_w = self.title_box_width_var.get()
-        title_box_h = self.title_box_height_var.get()
-        title_box_x = int((CANVAS_W - title_box_w) / 2)
-        title_box_y = self.title_box_y_var.get()
-        title_box = (title_box_x, title_box_y, title_box_x + title_box_w, title_box_y + title_box_h)
-        header_box = (420, self.header_y_var.get() - 22, CANVAS_W - 420, self.header_y_var.get() + 44)
-        subtitle_box = (380, self.subtitle_y_var.get() - 24, CANVAS_W - 380, self.subtitle_y_var.get() + 52)
+        title_box = self._layout_box("title_box")
+        title_box_x, title_box_y, title_box_right, title_box_bottom = title_box
+        title_box_w = title_box_right - title_box_x
+        title_box_h = title_box_bottom - title_box_y
+        header_box = self._layout_box("header")
+        subtitle_box = self._layout_box("subtitle")
 
         title_margin_x = 60
         title_text_x = title_box_x + title_margin_x
@@ -689,12 +1004,13 @@ class TitleCardsTab(ttk.Frame):
             bg = self.background_image.copy()
             x, y, w, h = fit_contain(bg.width, bg.height, CANVAS_W, CANVAS_H)
             bg = bg.resize((w, h), Image.LANCZOS)
-            draw.rectangle((0, 0, CANVAS_W, CANVAS_H), fill="#F3F4F6")
+            draw.rectangle((0, 0, CANVAS_W, CANVAS_H), fill=base_bg)
             img.alpha_composite(bg, (x, y))
         else:
-            draw.rectangle((0, 0, CANVAS_W, CANVAS_H), fill="#F3F4F6")
-            draw.rounded_rectangle((70, 70, CANVAS_W - 70, CANVAS_H - 70), radius=20, outline="#E5E7EB", width=2)
-            if self.show_title_box_var.get():
+            draw.rectangle((0, 0, CANVAS_W, CANVAS_H), fill=base_bg)
+            if show_placeholders:
+                draw.rounded_rectangle((70, 70, CANVAS_W - 70, CANVAS_H - 70), radius=20, outline="#E5E7EB", width=2)
+            if show_placeholders and self.show_title_box_var.get():
                 draw.rounded_rectangle(title_box, radius=18, outline="#E5E7EB", width=2, fill="#FAFAFA")
 
         header_text = self.reihe_var.get().strip()
@@ -727,10 +1043,12 @@ class TitleCardsTab(ttk.Frame):
         if header_text and not header_hidden:
             header_bbox = draw.textbbox((0, 0), header_text, font=header_font)
             header_w = header_bbox[2] - header_bbox[0]
-            header_x = (CANVAS_W - header_w) / 2
+            header_h = header_bbox[3] - header_bbox[1]
+            header_x = header_box[0] + ((header_box[2] - header_box[0]) - header_w) / 2
+            header_y = header_box[1] + ((header_box[3] - header_box[1]) - header_h) / 2
             draw_text_with_style(
                 img,
-                (header_x, self.header_y_var.get() - header_bbox[1]),
+                (header_x, header_y - header_bbox[1]),
                 header_text,
                 header_font,
                 header_color,
@@ -742,10 +1060,12 @@ class TitleCardsTab(ttk.Frame):
         if subtitle_text and not subtitle_hidden:
             subtitle_bbox = draw.textbbox((0, 0), subtitle_text, font=subtitle_font)
             subtitle_w = subtitle_bbox[2] - subtitle_bbox[0]
-            subtitle_x = (CANVAS_W - subtitle_w) / 2
+            subtitle_h = subtitle_bbox[3] - subtitle_bbox[1]
+            subtitle_x = subtitle_box[0] + ((subtitle_box[2] - subtitle_box[0]) - subtitle_w) / 2
+            subtitle_y = subtitle_box[1] + ((subtitle_box[3] - subtitle_box[1]) - subtitle_h) / 2
             draw_text_with_style(
                 img,
-                (subtitle_x, self.subtitle_y_var.get() - subtitle_bbox[1]),
+                (subtitle_x, subtitle_y - subtitle_bbox[1]),
                 subtitle_text,
                 subtitle_font,
                 subtitle_color,
@@ -797,23 +1117,27 @@ class TitleCardsTab(ttk.Frame):
                 y_top += h + line_spacing
 
         if self.show_footer_var.get() and not self.use_background_var.get():
-            left_box = (110, 860, 870, 1010)
-            right_box = (1390, 835, 1750, 1000)
+            left_box = self._layout_box("left_logo")
+            right_box = self._layout_box("partner_logo")
 
             if self.left_logo is not None:
                 logo = self.left_logo.copy()
-                x, y, w, h = fit_contain(logo.width, logo.height, 760, 150, 0)
+                box_w = left_box[2] - left_box[0]
+                box_h = left_box[3] - left_box[1]
+                x, y, w, h = fit_contain(logo.width, logo.height, box_w, box_h, 0)
                 logo = logo.resize((w, h), Image.LANCZOS)
-                img.alpha_composite(logo, (110 + x, 860 + y))
-            else:
+                img.alpha_composite(logo, (left_box[0] + x, left_box[1] + y))
+            elif show_placeholders:
                 self._draw_neutral_slot(draw, left_box, "Logo links unten")
 
             if self.partner_logo is not None:
                 logo = self.partner_logo.copy()
-                x, y, w, h = fit_contain(logo.width, logo.height, 360, 165, 18)
+                box_w = right_box[2] - right_box[0]
+                box_h = right_box[3] - right_box[1]
+                x, y, w, h = fit_contain(logo.width, logo.height, box_w, box_h, 18)
                 logo = logo.resize((w, h), Image.LANCZOS)
-                img.alpha_composite(logo, (1390 + x, 835 + y))
-            else:
+                img.alpha_composite(logo, (right_box[0] + x, right_box[1] + y))
+            elif show_placeholders:
                 self._draw_neutral_slot(draw, right_box, "Partnerlogo")
 
         return img
@@ -833,7 +1157,10 @@ class TitleCardsTab(ttk.Frame):
             self.preview_canvas.delete("all")
             x = max(12, (canvas_w - preview_w) // 2)
             y = max(12, (canvas_h - preview_h) // 2)
+            self._preview_scale = scale
+            self._preview_origin = (x, y)
             self.preview_canvas.create_image(x, y, image=self.preview_photo, anchor="nw")
+            self._draw_preview_layout_handles()
             self.preview_canvas.configure(scrollregion=(0, 0, canvas_w, canvas_h))
 
             self.save_state()
@@ -859,6 +1186,13 @@ class TitleCardsTab(ttk.Frame):
         self.subtitle_size_var.set(52)
         self.header_y_var.set(130)
         self.subtitle_y_var.set(220)
+        self.header_x_var.set(420)
+        self.header_w_var.set(1080)
+        self.header_h_var.set(66)
+        self.subtitle_x_var.set(380)
+        self.subtitle_w_var.set(1160)
+        self.subtitle_h_var.set(76)
+        self.title_box_x_var.set(390)
         self.title_box_y_var.set(360)
         self.title_box_width_var.set(1140)
         self.title_box_height_var.set(320)
@@ -879,6 +1213,16 @@ class TitleCardsTab(ttk.Frame):
             self.font_var.set(self.font_names[0])
         self.bold_var.set(False)
         self.italic_var.set(False)
+        self.left_logo_x_var.set(110)
+        self.left_logo_y_var.set(860)
+        self.left_logo_w_var.set(760)
+        self.left_logo_h_var.set(150)
+        self.partner_logo_x_var.set(1390)
+        self.partner_logo_y_var.set(835)
+        self.partner_logo_w_var.set(360)
+        self.partner_logo_h_var.set(165)
+        self._selected_layout_item = None
+        self._preview_drag = None
         self.export_name_var.set("titelkarte.png")
         if not initial:
             self.status_var.set("Zurückgesetzt.")
@@ -901,6 +1245,59 @@ class TitleCardsTab(ttk.Frame):
             self.status_var.set(f"Exportfehler: {exc}")
             messagebox.showerror("Exportfehler", str(exc))
 
+    def _confirm_project_overwrite(self, target: Path) -> bool:
+        result = {"overwrite": False}
+        win = tk.Toplevel(self)
+        win.title("Titelkarte überschreiben?")
+        win.transient(self.winfo_toplevel())
+        win.resizable(False, False)
+        win.grab_set()
+
+        frame = ttk.Frame(win, padding=18)
+        frame.pack(fill="both", expand=True)
+
+        content = ttk.Frame(frame)
+        content.pack(fill="both", expand=True)
+
+        bird_path = Path(__file__).resolve().parents[3] / "assets" / "vogel3_light_512.png"
+        if bird_path.exists():
+            try:
+                img = Image.open(bird_path).resize((96, 96), Image.LANCZOS)
+                self._overwrite_dialog_photo = ImageTk.PhotoImage(img)
+                ttk.Label(content, image=self._overwrite_dialog_photo).pack(side="left", padx=(0, 16), anchor="n")
+            except Exception:
+                pass
+
+        text_box = ttk.Frame(content)
+        text_box.pack(side="left", fill="both", expand=True)
+        ttk.Label(
+            text_box,
+            text="Im Projektordner existiert bereits eine Titelkarte mit diesem Dateinamen:",
+            wraplength=420,
+            justify="left",
+        ).pack(anchor="w")
+        ttk.Label(text_box, text=target.name, font=("Segoe UI", 10, "bold"), wraplength=420).pack(anchor="w", pady=(8, 8))
+        ttk.Label(text_box, text="Möchten Sie diese Datei wirklich überschreiben?", wraplength=420, justify="left").pack(anchor="w")
+
+        btn_row = ttk.Frame(frame)
+        btn_row.pack(fill="x", pady=(18, 0))
+
+        def close(overwrite: bool):
+            result["overwrite"] = overwrite
+            win.destroy()
+
+        ttk.Button(btn_row, text="Nein", command=lambda: close(False)).pack(side="right")
+        ttk.Button(btn_row, text="Ja, überschreiben", command=lambda: close(True)).pack(side="right", padx=(0, 8))
+        win.protocol("WM_DELETE_WINDOW", lambda: close(False))
+
+        win.update_idletasks()
+        root = self.winfo_toplevel()
+        x = root.winfo_rootx() + max(0, (root.winfo_width() - win.winfo_width()) // 2)
+        y = root.winfo_rooty() + max(0, (root.winfo_height() - win.winfo_height()) // 2)
+        win.geometry(f"+{x}+{y}")
+        win.wait_window()
+        return result["overwrite"]
+
     def export_to_project(self):
         out_dir = self._output_dir()
         project = getattr(self.app, "project", None)
@@ -913,6 +1310,11 @@ class TitleCardsTab(ttk.Frame):
             if not filename.lower().endswith(".png"):
                 filename += ".png"
             target = out_dir / filename
+            if target.exists():
+                overwrite = self._confirm_project_overwrite(target)
+                if not overwrite:
+                    self.status_var.set("Export abgebrochen: Datei existiert bereits.")
+                    return
             img = self.render_image(show_placeholders=False).convert("RGB")
             img.save(target, format="PNG")
             self.status_var.set(f"In Projekt exportiert: {target.name}")

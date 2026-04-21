@@ -4,7 +4,7 @@ Bleepling ist eine lokal laufende Open-Source-Anwendung zur Anonymisierung von A
 
 Die Anwendung unterstützt einen nachvollziehbaren Prüf-Workflow: Aus einem Video oder einer Audioquelle werden Transkriptionsdaten erzeugt, daraus Kandidaten für mögliche Namensnennungen abgeleitet, diese werden menschlich geprüft und anschließend in Form einer Times-Datei für den finalen Bleep-Export verwendet.
 
-Seit Version **1.2.1** enthält Bleepling zusätzlich den Reiter **„Titelkarten“**. Seit Version **1.3.0** kommt mit **„Schnitt & Kapitel“** ein weiterer Arbeitsbereich hinzu, mit dem aus vorhandenen Quellvideos zunächst ein Arbeitsvideo gebildet und daraus einzelne Clips für den weiteren Prüf-Workflow erzeugt werden können. Mit Version **1.4.0** wurde insbesondere der Titelkarten-Reiter deutlich ausgebaut und der Reiter **„Einstellungen / Logs“** klarer strukturiert. Version **1.4.1** verbessert zusätzlich den Import und die flexible Übernahme von Teilnehmerlisten im Reiter **„Prüfen & Entscheiden“**. Version **1.5.0** bündelt nun zahlreiche sichtbare Workflow-Verbesserungen bei **Titelkarten**, **Gezielter Nachbearbeitung**, **Medienübersicht**, **Render-Abbruch**, **Button-/Scroll-Verhalten** und **Einstellungen / Logs**.
+Seit Version **1.2.1** enthält Bleepling zusätzlich den Reiter **„Titelkarten“**. Seit Version **1.3.0** kommt mit **„Schnitt & Kapitel“** ein weiterer Arbeitsbereich hinzu, mit dem aus vorhandenen Quellvideos zunächst ein Arbeitsvideo gebildet und daraus einzelne Clips für den weiteren Prüf-Workflow erzeugt werden können. Mit Version **1.4.0** wurde insbesondere der Titelkarten-Reiter deutlich ausgebaut und der Reiter **„Einstellungen / Logs“** klarer strukturiert. Version **1.4.1** verbessert zusätzlich den Import und die flexible Übernahme von Teilnehmerlisten im Reiter **„Prüfen & Entscheiden“**. Version **1.5.0** bündelt zahlreiche sichtbare Workflow-Verbesserungen bei **Titelkarten**, **Gezielter Nachbearbeitung**, **Medienübersicht**, **Render-Abbruch**, **Button-/Scroll-Verhalten** und **Einstellungen / Logs**. Version **1.5.1** ergänzt Sicherheitsabfragen, Projektlöschung, interaktive Titelkarten-Positionierung und zentrale Render-Parameter für die gezielte Nachbearbeitung.
 
 ## Hauptfunktionen
 
@@ -21,8 +21,9 @@ Seit Version **1.2.1** enthält Bleepling zusätzlich den Reiter **„Titelkarte
 - Vor- und Nachspannbilder mit synchron verlängerter Stille sowie Komma-Unterstützung bei Sekundeneingaben
 - Erstellung von PNG-Titelkarten über den Reiter **„Titelkarten“**
 - zweite Dachzeile / Untertitel sowie mehrzeilige Titelkarten-Layouts mit Live-Vorschau
+- interaktive Titelkarten-Layoutfelder für Dachzeilen, Titelbox und Logos mit Verschieben, Skalieren und mittigem Einrasten
 - projektweite Medienübersicht mit kategorisierten Dateibeständen und abschnittsbezogenem Öffnen der jeweiligen Ordner
-- Einstellungs- und Log-Bereich für Prüfung, Installation und Fehlersuche
+- Einstellungs- und Log-Bereich für Prüfung, Installation, Render-Parameter und Fehlersuche
 
 ## Ziel des Projekts
 
@@ -69,9 +70,9 @@ Diese Komponenten sind **nicht Bestandteil dieses Projekts** und müssen bei Bed
 
 ## Reiter im Überblick
 
-Der Arbeitsstand **1.5.0** verwendet insbesondere diese sichtbaren Reiter:
+Der Arbeitsstand **1.5.1** verwendet insbesondere diese sichtbaren Reiter:
 
-- **Projekt** – Projekt anlegen, laden und verwalten
+- **Projekt** – Projekt anlegen, laden und vollständige Projektordner nach Sicherheitsabfrage löschen
 - **Medien** – Projektmedien importieren und vorhandene Projektdateien strukturiert überblicken
 - **Schnitt & Kapitel** – Quellvideos sortieren, Arbeitsvideo bilden, manuell schneiden und Clips erzeugen
 - **Prüfen & Entscheiden** – Vorbereitung, Namenslisten, Kandidatenprüfung, Audio-Feinprüfung, Bleep-Parameter und Times-Ableitung
@@ -111,9 +112,14 @@ Unterstützt werden unter anderem:
 - Platzhalter für Dachzeilen nur in der Live-Vorschau, nicht im PNG-Export
 - gezieltes Ausblenden von Dachzeile und zweiter Dachzeile
 - Logos links unten und rechts unten
+- interaktive Positionierung und Größenänderung von Dachzeile, zweiter Dachzeile, Titelbox sowie beiden Logo-Feldern direkt in der Live-Vorschau
+- magnetisches Einrasten auf die Bildmitte mit sichtbaren Hilfslinien
+- Sicherheitsabfrage beim projektbezogenen Export, wenn eine Titelkarte mit gleichem Dateinamen bereits vorhanden ist
 - Hintergrundbild als Grundlayout mit automatischer Einpassung in das Zielformat
 - Export direkt in den Projektordner `04_output/titlecards`
 - zusätzlicher PNG-Export an einen frei wählbaren Ort
+
+Die Live-Vorschau darf Hilfsrahmen, Platzhalter und Bearbeitungslinien anzeigen. Der eigentliche PNG-Export und die Verwendung als Vor- oder Nachspannbild werden dagegen ohne diese Hilfen erzeugt; ohne eigenes Hintergrundbild ist der Ausgabehintergrund weiß.
 
 Im Zusammenspiel mit **„Gezielte Nachbearbeitung“** ist wichtig: Vor- und Nachspannbilder werden dort synchron zum eigentlichen Medium zusammengesetzt. Die vorgeschalteten oder angehängten Bildsegmente verlängern intern auch die Audiospur mit stillen Abschnitten, sodass Bild- und Tonlauf des eigentlichen Videos erhalten bleiben.
 
@@ -129,6 +135,16 @@ Bleepling enthält einen eigenen Reiter **„Einstellungen / Logs“**. Dort kan
 - optionale CUDA-/cuDNN-Komponenten und Pfade
 - python-vlc sowie optionale VLC-/libVLC-Komponenten
 - Render-Backend und weitere technische Einstellungen
+
+Seit Version **1.5.1** enthält dieser Reiter außerdem den Bereich **„Rendern / Ausgabe“**. Dort werden projektbezogen zentrale Renderwerte festgelegt:
+
+- **Backend**: `auto` nutzt nach Möglichkeit GPU-Encoding und fällt sonst auf CPU zurück; `gpu` versucht bevorzugt den NVIDIA-Encoder; `cpu` nutzt bewusst den Prozessor.
+- **Qualität (CQ/CRF)**: niedrigere Werte liefern höhere Qualität und größere Dateien; höhere Werte komprimieren stärker. Der Standard `30` entspricht dem bisherigen Verhalten der gezielten Nachbearbeitung.
+- **Preset**: schnellere Presets rendern flotter, langsamere Presets können bei gleicher Qualität effizienter komprimieren.
+- **Audio-Bitrate**: `96k` ist für Sprache meist ausreichend; höhere Werte sind sinnvoll, wenn Musik oder allgemeiner Ton wichtiger ist.
+- **Skalierung**: **„Originalgröße beibehalten“** ist der sichere Standard für die gezielte Nachbearbeitung. `1280 px` erzeugt kleinere Web-Dateien, `1920 px` ist Full-HD-orientiert und kann kleine Quellen unnötig hochskalieren.
+
+Die gezielte Nachbearbeitung übernimmt diese zentralen Renderwerte für Codec, Qualität, Preset, Audio-Bitrate und Skalierung. Die dortigen Fachparameter wie Bleep-Zeiten, Vorlauf, Nachlauf sowie Vor- und Nachspannbild bleiben weiterhin im Reiter **„Gezielte Nachbearbeitung“**.
 
 Der Bereich dient außerdem dazu, Installationshinweise, sichtbare Einrichtungsbefehle und Hilfetexte für typische Diagnosefälle bereitzustellen oder deren Ausführung lokal vorzubereiten.
 
@@ -262,7 +278,7 @@ Im Reiter **„Prüfen & Entscheiden“** können importierte Teilnehmerlisten w
 
 ## Projektstruktur
 
-Im Projektstand 1.5.0 werden unter anderem diese projektbezogenen Pfade verwendet:
+Im Projektstand 1.5.1 werden unter anderem diese projektbezogenen Pfade verwendet:
 
 - `01_input/video`
 - `03_processing/04_cutting/working_video`

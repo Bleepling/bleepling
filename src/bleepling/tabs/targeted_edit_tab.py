@@ -27,6 +27,20 @@ except Exception:
 
 
 VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi", ".m4v", ".wmv"}
+SCALE_OPTIONS = {
+    "Originalgröße beibehalten": None,
+    "1280 px Breite (kleiner für Web)": 1280,
+    "1920 px Breite (größer / Full HD)": 1920,
+}
+NVENC_PRESET_MAP = {
+    "ultrafast": "p1",
+    "superfast": "p2",
+    "veryfast": "p3",
+    "fast": "p4",
+    "medium": "p5",
+    "slow": "p6",
+    "veryslow": "p7",
+}
 
 
 def _list_files(directory: Path, exts: set[str]):
@@ -97,6 +111,15 @@ class TargetedEditTab(ttk.Frame):
 
     def _project(self):
         return getattr(self.app, "project", None)
+
+    def _settings(self) -> dict:
+        project = self._project()
+        if project is not None and hasattr(project, "read_settings"):
+            try:
+                return project.read_settings()
+            except Exception:
+                pass
+        return {}
 
     def _output_video_dir(self, p) -> Path:
         return getattr(p, "output_video_dir", p.root_path / "04_output" / "videos")
@@ -355,6 +378,46 @@ class TargetedEditTab(ttk.Frame):
         gain = cfg["gain"]
         return build_bleep_audio_filter(intervals, freq, gain, sample_rate=48000)
 
+    def _render_settings(self) -> dict:
+        settings = self._settings()
+        return {
+            "backend": settings.get("render_backend", "auto"),
+            "quality": int(settings.get("render_quality", 30)),
+            "preset": settings.get("render_preset", "medium"),
+            "audio_bitrate": settings.get("render_audio_bitrate", "96k"),
+            "scale": settings.get("render_scale", "Originalgröße beibehalten"),
+        }
+
+    def _effective_video_codec(self, render_cfg: dict) -> str:
+        backend = render_cfg.get("backend", "auto")
+        gpu_available = shutil.which("nvidia-smi") is not None
+        if backend == "cpu":
+            return "libx264"
+        if backend == "gpu" and gpu_available:
+            return "h264_nvenc"
+        if backend == "auto" and gpu_available:
+            return "h264_nvenc"
+        return "libx264"
+
+    def _video_encode_args(self, codec: str, render_cfg: dict) -> list[str]:
+        preset = render_cfg.get("preset", "medium")
+        quality = str(render_cfg.get("quality", 30))
+        if codec == "h264_nvenc":
+            return ["-preset", NVENC_PRESET_MAP.get(preset, "p5"), "-cq", quality]
+        return ["-preset", preset, "-crf", quality]
+
+    def _target_size(self, width: int, height: int, render_cfg: dict) -> tuple[int, int]:
+        target_width = SCALE_OPTIONS.get(render_cfg.get("scale"), None)
+        if not target_width:
+            return width, height
+        target_width = max(2, int(target_width))
+        if width <= 0 or height <= 0:
+            return target_width, 1080 if target_width >= 1920 else 720
+        target_height = round(height * (target_width / width))
+        if target_height % 2:
+            target_height += 1
+        return target_width, max(2, target_height)
+
     def _show_progress_window(self):
         if self.progress_win is not None:
             return
@@ -499,6 +562,11 @@ class TargetedEditTab(ttk.Frame):
             width = info.get("width", 1920) or 1920
             height = info.get("height", 1080) or 1080
             duration = info.get("duration", 0.0)
+            render_cfg = self._render_settings()
+            render_width, render_height = self._target_size(width, height, render_cfg)
+            codec = self._effective_video_codec(render_cfg)
+            encode_args = self._video_encode_args(codec, render_cfg)
+            audio_bitrate = render_cfg.get("audio_bitrate", "96k")
 
             out_dir = out_file.parent
             out_dir.mkdir(parents=True, exist_ok=True)
@@ -523,7 +591,6 @@ class TargetedEditTab(ttk.Frame):
                 if res.returncode != 0:
                     raise RuntimeError((res.stderr or res.stdout or "Fehler bei gezielten Bleeps")[:5000])
 
-                codec = "h264_nvenc" if shutil.which("nvidia-smi") else "libx264"
                 cmd_mux = [
                     ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-progress", "pipe:1", "-nostats",
                     "-i", str(media),
@@ -532,11 +599,10 @@ class TargetedEditTab(ttk.Frame):
                     "-map", "1:a:0",
                     "-c:v", codec,
                 ]
-                if codec == "h264_nvenc":
-                    cmd_mux += ["-preset", "p5", "-cq", "30"]
-                else:
-                    cmd_mux += ["-preset", "medium", "-crf", "30"]
-                cmd_mux += ["-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(temp_targeted)]
+                if (render_width, render_height) != (width, height):
+                    cmd_mux += ["-vf", f"scale={render_width}:{render_height}:force_original_aspect_ratio=decrease,pad={render_width}:{render_height}:(ow-iw)/2:(oh-ih)/2,setsar=1"]
+                cmd_mux += encode_args
+                cmd_mux += ["-c:a", "aac", "-b:a", audio_bitrate, "-movflags", "+faststart", str(temp_targeted)]
                 rc, err = self._run_progress_cmd(cmd_mux, duration)
                 if rc != 0:
                     raise RuntimeError((err or "Fehler beim gezielten Nachbleepen")[:5000])
@@ -567,8 +633,8 @@ class TargetedEditTab(ttk.Frame):
                     inputs.extend(["-f", "lavfi", "-t", str(seconds), "-i", "anullsrc=r=48000:cl=stereo"])
                     input_idx += 1
                     filter_parts.append(
-                        f"[{video_input_idx}:v:0]scale={width}:{height}:force_original_aspect_ratio=decrease,"
-                        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=25,format=yuv420p[vseg{segment_idx}]"
+                        f"[{video_input_idx}:v:0]scale={render_width}:{render_height}:force_original_aspect_ratio=decrease,"
+                        f"pad={render_width}:{render_height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=25,format=yuv420p[vseg{segment_idx}]"
                     )
                     filter_parts.append(f"[{audio_input_idx}:a:0]aresample=48000,asetpts=PTS-STARTPTS[aseg{segment_idx}]")
                     concat_labels.append(f"[vseg{segment_idx}][aseg{segment_idx}]")
@@ -581,8 +647,8 @@ class TargetedEditTab(ttk.Frame):
                 inputs.extend(["-i", str(working_video)])
                 input_idx += 1
                 filter_parts.append(
-                    f"[{video_input_idx}:v:0]scale={width}:{height}:force_original_aspect_ratio=decrease,"
-                    f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=25,format=yuv420p[vseg{segment_idx}]"
+                    f"[{video_input_idx}:v:0]scale={render_width}:{render_height}:force_original_aspect_ratio=decrease,"
+                    f"pad={render_width}:{render_height}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=25,format=yuv420p[vseg{segment_idx}]"
                 )
                 filter_parts.append(f"[{video_input_idx}:a:0]aresample=48000,asetpts=PTS-STARTPTS[aseg{segment_idx}]")
                 concat_labels.append(f"[vseg{segment_idx}][aseg{segment_idx}]")
@@ -594,19 +660,15 @@ class TargetedEditTab(ttk.Frame):
                 filter_parts.append(f"{''.join(concat_labels)}concat=n={segment_idx}:v=1:a=1[vout][aout]")
                 filter_complex = ";".join(filter_parts)
 
-                codec = "h264_nvenc" if shutil.which("nvidia-smi") else "libx264"
                 cmd_video = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-progress", "pipe:1", "-nostats"] + inputs + [
                     "-filter_complex", filter_complex,
                     "-map", "[vout]",
                     "-map", "[aout]",
                     "-c:v", codec,
                 ]
-                if codec == "h264_nvenc":
-                    cmd_video += ["-preset", "p5", "-cq", "30"]
-                else:
-                    cmd_video += ["-preset", "medium", "-crf", "30"]
+                cmd_video += encode_args
                 final_duration = duration + (pre_seconds if have_pre else 0.0) + (post_seconds if have_post else 0.0)
-                cmd_video += ["-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(temp_concat_media)]
+                cmd_video += ["-c:a", "aac", "-b:a", audio_bitrate, "-movflags", "+faststart", str(temp_concat_media)]
                 rc, err = self._run_progress_cmd(cmd_video, max(final_duration, 1.0))
                 if rc != 0:
                     raise RuntimeError((err or "Fehler beim Zusammensetzen von Vor- und Nachspann")[:5000])
@@ -714,7 +776,7 @@ class TargetedEditTab(ttk.Frame):
         runf.pack(fill="x", padx=12, pady=(0, 8))
         ttk.Label(
             runf,
-            text="Ablauf: Erst wird das gezielte Nachbleepen auf das gewählte Video angewendet. Danach werden Vor- und Nachspannbilder gemeinsam in einem einzigen weiteren Schritt zusammengesetzt. Dadurch bleiben die Bleep-Zeiten korrekt und Vor- und Nachspann werden nicht unnötig zweimal gerendert.",
+            text="Ablauf: Erst wird das gezielte Nachbleepen auf das gewählte Video angewendet. Danach werden Vor- und Nachspannbilder gemeinsam in einem einzigen weiteren Schritt zusammengesetzt. Codec, Qualität, Preset, Audio-Bitrate und Skalierung kommen aus Einstellungen / Logs > Rendern / Ausgabe.",
             justify="left",
             wraplength=1250,
         ).pack(anchor="w", padx=8, pady=(8, 6))

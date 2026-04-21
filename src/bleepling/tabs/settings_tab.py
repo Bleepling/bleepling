@@ -17,9 +17,21 @@ HELP = {
     "Zusätzliche CUDA-Pfade": "Hier können Sie Ordner eintragen, in denen CUDA- oder cuDNN-Dateien liegen. Das hilft, wenn die GPU vorhanden ist, Bleepling die nötigen Dateien aber nicht automatisch findet.",
     "Transkriptionsmodus": "Auto versucht zuerst GPU und danach CPU. GPU versucht nur die Grafikkarte. CPU nutzt nur den Prozessor.",
     "Theme": "Hell = heller Hintergrund, dunkle Schrift. Dunkel = dunkler Hintergrund, weiße Schrift.",
-    "Render-Backend": "Auto nutzt bevorzugt GPU, wenn ein NVIDIA-Encoder verfügbar ist. GPU erzwingt den GPU-Encoder. CPU erzwingt CPU-Encoding. Das wirkt sich auf die Profile im Reiter Video & Audio / FFmpeg aus.",
+    "Render-Backend": "Legt fest, womit Video gerendert wird.\n\nAuto: nutzt GPU, wenn ein NVIDIA-Encoder gefunden wird, sonst CPU.\nGPU: versucht den NVIDIA-Encoder zu nutzen; wenn keiner verfügbar ist, fällt Bleepling sicherheitshalber auf CPU zurück.\nCPU: rendert immer mit dem Prozessor. Das ist meist langsamer, aber sehr kompatibel.",
     "Textgröße": "Normal ist die Standardgröße. Etwas größer und Groß vergrößern Schriften moderat, ohne den Seitenaufbau unnötig zu zerstören.",
+    "Render-Qualität": "Legt die Videoqualität für Render-Ausgaben fest.\n\n18 bis 23: höhere Qualität, größere Dateien.\n24 bis 30: guter Alltagsbereich.\n31 bis 38: kleinere Dateien, sichtbar stärkere Kompression.\n\n30 ist der bisherige Standard für die gezielte Nachbearbeitung.",
+    "Render-Preset": "Legt fest, wie viel Zeit FFmpeg für die Kompression verwenden darf.\n\nultrafast, superfast, veryfast: schneller, aber meist größere Dateien.\nfast, medium: guter Standardbereich.\nslow, veryslow: langsamer, dafür oft effizientere Kompression.\n\nBei NVIDIA-GPU werden diese Stufen intern auf passende NVENC-Presets übertragen.",
+    "Render-Audio-Bitrate": "Legt die AAC-Audioqualität fest.\n\n64k: sehr klein, eher sparsam.\n96k: bisheriger Standard und für Sprache meist ausreichend.\n128k: guter allgemeiner Standard.\n160k oder 192k: besser für Musik oder allgemeinen Ton, aber größere Dateien.",
+    "Render-Skalierung": "Legt die Ausgabeauflösung fest.\n\nOriginalgröße beibehalten: verändert die Auflösung nicht; sicherer Standard für gezielte Nachbearbeitung.\n1280 px Breite: kleinere Web-Dateien, bei großen Quellen weniger Details.\n1920 px Breite: Full-HD-orientiert; kann kleine Quellen unnötig hochskalieren.",
 }
+
+RENDER_SCALE_OPTIONS = [
+    "Originalgröße beibehalten",
+    "1280 px Breite (kleiner für Web)",
+    "1920 px Breite (größer / Full HD)",
+]
+
+RENDER_PRESET_OPTIONS = ["ultrafast", "superfast", "veryfast", "fast", "medium", "slow", "veryslow"]
 
 MODEL_MAP = {
     "Schnell": "small",
@@ -53,6 +65,10 @@ class SettingsTab(ttk.Frame):
         self.theme = tk.StringVar(value="light")
         self.render_backend = tk.StringVar(value="auto")
         self.ui_scale = tk.StringVar(value="normal")
+        self.render_quality = tk.IntVar(value=30)
+        self.render_preset = tk.StringVar(value="medium")
+        self.render_audio_bitrate = tk.StringVar(value="96k")
+        self.render_scale = tk.StringVar(value="Originalgröße beibehalten")
 
         controls = ttk.Frame(frm)
         controls.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 8))
@@ -72,8 +88,7 @@ class SettingsTab(ttk.Frame):
         self._add_setting_row(left, 2, "Compute-Type", self.compute, ["float16", "int8_float16", "int8", "float32"], 12, "Compute-Type")
 
         self._add_setting_row(right, 0, "Theme", self.theme, ["light", "dark"], 10, "Theme")
-        self._add_setting_row(right, 1, "Render-Backend", self.render_backend, ["auto", "gpu", "cpu"], 10, "Render-Backend")
-        self._add_setting_row(right, 2, "Textgröße", self.ui_scale, ["normal", "etwas größer", "groß"], 14, "Textgröße")
+        self._add_setting_row(right, 1, "Textgröße", self.ui_scale, ["normal", "etwas größer", "groß"], 14, "Textgröße")
 
         paths_row = ttk.Frame(frm)
         paths_row.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 8))
@@ -83,8 +98,23 @@ class SettingsTab(ttk.Frame):
         ttk.Button(paths_row, text="Ordner hinzufügen", command=self.add_folder).grid(row=0, column=2, padx=(0, 8))
         ttk.Button(paths_row, text="?", width=3, command=lambda: self.show_help("Zusätzliche CUDA-Pfade")).grid(row=0, column=3)
 
+        render_box = ttk.LabelFrame(frm, text="")
+        render_box.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 10))
+        render_box.columnconfigure(1, weight=1)
+        render_box.columnconfigure(4, weight=1)
+        ttk.Label(render_box, text="Rendern / Ausgabe", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, columnspan=6, sticky="w", pady=(8, 4))
+        self._add_setting_row(render_box, 1, "Backend", self.render_backend, ["auto", "gpu", "cpu"], 10, "Render-Backend")
+        self._add_spin_setting_row(render_box, 2, "Qualität (CQ/CRF)", self.render_quality, 18, 38, 5, "Render-Qualität")
+        self._add_setting_row(render_box, 3, "Preset", self.render_preset, RENDER_PRESET_OPTIONS, 12, "Render-Preset")
+        ttk.Label(render_box, text="Audio-Bitrate").grid(row=1, column=3, sticky="w", padx=(24, 0), pady=4)
+        ttk.Combobox(render_box, textvariable=self.render_audio_bitrate, values=["64k", "96k", "128k", "160k", "192k"], width=12, state="readonly").grid(row=1, column=4, sticky="ew", padx=(10, 8), pady=4)
+        ttk.Button(render_box, text="?", width=3, command=lambda: self.show_help("Render-Audio-Bitrate")).grid(row=1, column=5, sticky="w", pady=4)
+        ttk.Label(render_box, text="Skalierung").grid(row=2, column=3, sticky="w", padx=(24, 0), pady=4)
+        ttk.Combobox(render_box, textvariable=self.render_scale, values=RENDER_SCALE_OPTIONS, width=30, state="readonly").grid(row=2, column=4, sticky="ew", padx=(10, 8), pady=4)
+        ttk.Button(render_box, text="?", width=3, command=lambda: self.show_help("Render-Skalierung")).grid(row=2, column=5, sticky="w", pady=4)
+
         row3 = ttk.Frame(frm)
-        row3.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 10))
+        row3.grid(row=4, column=0, sticky="ew", padx=12, pady=(0, 10))
         for txt, cmd in [
             ("Projekt speichern", self.save_settings),
             ("Prüfung ausführen", self.run_checks),
@@ -159,6 +189,11 @@ class SettingsTab(ttk.Frame):
         ttk.Combobox(parent, textvariable=variable, values=values, width=width, state="readonly").grid(row=row, column=1, sticky="ew", padx=(10, 8), pady=4)
         ttk.Button(parent, text="?", width=3, command=lambda k=help_key: self.show_help(k)).grid(row=row, column=2, sticky="w", pady=4)
 
+    def _add_spin_setting_row(self, parent, row, label, variable, from_, to, width, help_key):
+        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", pady=4)
+        ttk.Spinbox(parent, from_=from_, to=to, textvariable=variable, width=width).grid(row=row, column=1, sticky="w", padx=(10, 8), pady=4)
+        ttk.Button(parent, text="?", width=3, command=lambda k=help_key: self.show_help(k)).grid(row=row, column=2, sticky="w", pady=4)
+
     def _set_general_commands_text(self, resolve_cuda_paths: bool = False):
         install_cmd = self.environment_service.get_install_command()
         extra_paths = [p.strip() for p in self.paths.get().split(";") if p.strip()]
@@ -197,6 +232,10 @@ class SettingsTab(ttk.Frame):
             self.theme.set(s.get("theme", getattr(self.app, "current_theme", "light")))
             self.render_backend.set(s.get("render_backend", "auto"))
             self.ui_scale.set(s.get("ui_scale", getattr(self.app, "ui_scale", "normal")))
+            self.render_quality.set(int(s.get("render_quality", 30)))
+            self.render_preset.set(s.get("render_preset", "medium"))
+            self.render_audio_bitrate.set(s.get("render_audio_bitrate", "96k"))
+            self.render_scale.set(s.get("render_scale", "Originalgröße beibehalten"))
         finally:
             self._suspend_live_updates = False
         self._set_general_commands_text(resolve_cuda_paths=False)
@@ -266,6 +305,10 @@ class SettingsTab(ttk.Frame):
             "theme": self.theme.get(),
             "render_backend": self.render_backend.get(),
             "ui_scale": self.ui_scale.get(),
+            "render_quality": int(self.render_quality.get()),
+            "render_preset": self.render_preset.get(),
+            "render_audio_bitrate": self.render_audio_bitrate.get(),
+            "render_scale": self.render_scale.get(),
         })
         if hasattr(self.app, "save_ui_prefs"):
             self.app.save_ui_prefs(theme=self.theme.get(), ui_scale=self.ui_scale.get())

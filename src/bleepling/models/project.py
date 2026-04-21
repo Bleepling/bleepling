@@ -119,6 +119,11 @@ class Project:
             "compute_type": "float16",
             "extra_cuda_paths": "",
             "theme": "light",
+            "render_backend": "auto",
+            "render_quality": 30,
+            "render_preset": "medium",
+            "render_audio_bitrate": "96k",
+            "render_scale": "Originalgröße beibehalten",
         }
         try:
             if self.settings_file.exists():

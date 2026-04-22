@@ -4,6 +4,21 @@ Alle nennenswerten Änderungen an **Bleepling** sollen in dieser Datei dokumenti
 
 Die Struktur orientiert sich an einer einfachen, für Open-Source-Projekte gut lesbaren Versionshistorie.
 
+## [1.5.2] - 2026-04-22
+
+### Geändert
+- `words.json`-Erzeugung aus WAV-Dateien wieder an die echte Transkription angebunden; leere Platzhalter-JSON-Dateien werden nicht mehr als erfolgreicher Arbeitsschritt erzeugt
+- Transkription nutzt `faster-whisper` direkt als Fallback, wenn das alte Legacy-Transkriptionsskript nicht vorhanden ist
+- gebleepte Audioexporte werden klar getrennt in `04_output/audio` abgelegt; Videoexporte bleiben in `04_output/videos`
+- Start-BAT-Dateien vereinheitlicht; der Debug-Start zeigt Arbeitsordner, `PYTHONPATH` und Python-Version
+- Benutzerdokumentation als PDF auf Version 1.5.2 aktualisiert
+
+### Behoben
+- kombinierter Prüfworkflow nutzt wieder denselben echten `words.json`-Erzeugungsweg wie der Reiter **„Prüfen & Entscheiden“**
+- robustere Fehlermeldung bei HuggingFace-/Whisper-Cacheproblemen
+- robusteres Aufräumen temporärer FFmpeg-Dateien unter Windows
+- gezielte Nachbearbeitung schreibt finale Ausgaben zuverlässiger, wenn Windows temporäre Renderdateien kurzzeitig sperrt
+
 ## [1.5.1] - 2026-04-21
 
 ### Hinzugefügt

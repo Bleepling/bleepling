@@ -4,7 +4,7 @@ Bleepling ist eine lokal laufende Open-Source-Anwendung zur Anonymisierung von A
 
 Die Anwendung unterstützt einen nachvollziehbaren Prüf-Workflow: Aus einem Video oder einer Audioquelle werden Transkriptionsdaten erzeugt, daraus Kandidaten für mögliche Namensnennungen abgeleitet, diese werden menschlich geprüft und anschließend in Form einer Times-Datei für den finalen Bleep-Export verwendet.
 
-Seit Version **1.2.1** enthält Bleepling zusätzlich den Reiter **„Titelkarten“**. Seit Version **1.3.0** kommt mit **„Schnitt & Kapitel“** ein weiterer Arbeitsbereich hinzu, mit dem aus vorhandenen Quellvideos zunächst ein Arbeitsvideo gebildet und daraus einzelne Clips für den weiteren Prüf-Workflow erzeugt werden können. Mit Version **1.4.0** wurde insbesondere der Titelkarten-Reiter deutlich ausgebaut und der Reiter **„Einstellungen / Logs“** klarer strukturiert. Version **1.4.1** verbessert zusätzlich den Import und die flexible Übernahme von Teilnehmerlisten im Reiter **„Prüfen & Entscheiden“**. Version **1.5.0** bündelt zahlreiche sichtbare Workflow-Verbesserungen bei **Titelkarten**, **Gezielter Nachbearbeitung**, **Medienübersicht**, **Render-Abbruch**, **Button-/Scroll-Verhalten** und **Einstellungen / Logs**. Version **1.5.1** ergänzt Sicherheitsabfragen, Projektlöschung, interaktive Titelkarten-Positionierung und zentrale Render-Parameter für die gezielte Nachbearbeitung.
+Seit Version **1.2.1** enthält Bleepling zusätzlich den Reiter **„Titelkarten“**. Seit Version **1.3.0** kommt mit **„Schnitt & Kapitel“** ein weiterer Arbeitsbereich hinzu, mit dem aus vorhandenen Quellvideos zunächst ein Arbeitsvideo gebildet und daraus einzelne Clips für den weiteren Prüf-Workflow erzeugt werden können. Mit Version **1.4.0** wurde insbesondere der Titelkarten-Reiter deutlich ausgebaut und der Reiter **„Einstellungen / Logs“** klarer strukturiert. Version **1.4.1** verbessert zusätzlich den Import und die flexible Übernahme von Teilnehmerlisten im Reiter **„Prüfen & Entscheiden“**. Version **1.5.0** bündelt zahlreiche sichtbare Workflow-Verbesserungen bei **Titelkarten**, **Gezielter Nachbearbeitung**, **Medienübersicht**, **Render-Abbruch**, **Button-/Scroll-Verhalten** und **Einstellungen / Logs**. Version **1.5.1** ergänzt Sicherheitsabfragen, Projektlöschung, interaktive Titelkarten-Positionierung und zentrale Render-Parameter für die gezielte Nachbearbeitung. Version **1.5.2** stellt die echte `words.json`-Erzeugung aus WAV-Dateien wieder her, trennt Audioexporte klarer und macht temporäre Renderdateien unter Windows robuster.
 
 ## Hauptfunktionen
 
@@ -70,7 +70,7 @@ Diese Komponenten sind **nicht Bestandteil dieses Projekts** und müssen bei Bed
 
 ## Reiter im Überblick
 
-Der Arbeitsstand **1.5.1** verwendet insbesondere diese sichtbaren Reiter:
+Der Arbeitsstand **1.5.2** verwendet insbesondere diese sichtbaren Reiter:
 
 - **Projekt** – Projekt anlegen, laden und vollständige Projektordner nach Sicherheitsabfrage löschen
 - **Medien** – Projektmedien importieren und vorhandene Projektdateien strukturiert überblicken
@@ -278,11 +278,14 @@ Im Reiter **„Prüfen & Entscheiden“** können importierte Teilnehmerlisten w
 
 ## Projektstruktur
 
-Im Projektstand 1.5.1 werden unter anderem diese projektbezogenen Pfade verwendet:
+Im Projektstand 1.5.2 werden unter anderem diese projektbezogenen Pfade verwendet:
 
 - `01_input/video`
+- `02_transcription/wav`
+- `02_transcription/json`
 - `03_processing/04_cutting/working_video`
 - `04_output/videos`
+- `04_output/audio`
 - `04_output/titlecards`
 - `99_config/app_state.json`
 - `99_config/titlecards_state.json`

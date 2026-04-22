@@ -45,7 +45,7 @@ Sicherheitsmeldungen sollen nach Möglichkeit zeitnah geprüft und eingeordnet w
 
 ## Unterstützte Versionen
 
-Aktiv unterstützt wird im Zweifel nur der jeweils aktuelle veröffentlichte Projektstand. Für das anstehende Release ist dies der Stand **1.5.1**.
+Aktiv unterstützt wird im Zweifel nur der jeweils aktuelle veröffentlichte Projektstand. Für das anstehende Release ist dies der Stand **1.5.2**.
 
 Ältere Zwischenstände, experimentelle Branches oder lokale Testfassungen können von dieser Unterstützung abweichen.
 

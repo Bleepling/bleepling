@@ -2,7 +2,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk, filedialog
 from pathlib import Path
-import shutil, subprocess, json, sys, os, re
+import shutil, json, re
 from difflib import SequenceMatcher
 
 try:
@@ -783,7 +783,7 @@ class BleepingTab(ttk.Frame):
         ttk.Label(top, text="WAV").grid(row=1, column=0, sticky="w", padx=8, pady=4)
         self.wav_combo = ttk.Combobox(top, textvariable=self.wav_var, width=28, state="readonly")
         self.wav_combo.grid(row=1, column=1, sticky="we", padx=4, pady=4)
-        ttk.Button(top, text="words.json aus WAV erzeugen", command=self.make_words_json_stub, style="Accent.TButton").grid(row=1, column=2, sticky="w", padx=6, pady=4)
+        ttk.Button(top, text="words.json aus WAV erzeugen", command=self.make_words_json, style="Accent.TButton").grid(row=1, column=2, sticky="w", padx=6, pady=4)
 
         prep_helpbar = ttk.Frame(top)
         prep_helpbar.grid(row=1, column=3, columnspan=3, sticky="e", padx=8, pady=(2, 4))
@@ -1002,28 +1002,20 @@ class BleepingTab(ttk.Frame):
             self._set_status("Bitte zuerst Projekt und Videodatei wählen.")
             return
         video = self.app.project.input_video_dir / self.video_var.get()
-        wav = self.app.project.transcription_wav_dir / (video.stem + ".wav")
-        ffmpeg = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
-        if ffmpeg:
-            try:
-                subprocess.run([ffmpeg, "-y", "-i", str(video), "-vn", "-ac", "1", "-ar", "16000", str(wav)], check=True, capture_output=True)
-                self.refresh()
-                self.wav_var.set(wav.name)
-                self._set_status(f"WAV erzeugt: {wav.name}")
-                return
-            except Exception as e:
-                self._set_status(f"WAV-Erzeugung fehlgeschlagen: {e}")
-                return
-        self._set_status("FFmpeg wurde nicht gefunden.")
+        try:
+            wav = self.bleeping_service.create_wav_from_video(self.app.project, video)
+            self.refresh()
+            self.wav_var.set(wav.name)
+            self._set_status(f"WAV erzeugt: {wav.name}")
+        except Exception as e:
+            self._set_status(f"WAV-Erzeugung fehlgeschlagen: {e}")
 
-    def make_words_json_stub(self):
+    def make_words_json(self):
         if not self.app.project or not self.wav_var.get():
             self._set_status("Bitte zuerst eine WAV-Datei wählen.")
             return
 
         wav = self.app.project.transcription_wav_dir / self.wav_var.get()
-        out = self.app.project.transcription_json_dir / (wav.stem + ".words.json")
-        script = Path(__file__).resolve().parents[3] / "legacy_reference" / "v5_scripts" / "transcribe_with_word_timestamps_cuda_fix2.py"
 
         self._show_progress_window()
         self._set_status("Transkription gestartet ...")
@@ -1033,45 +1025,24 @@ class BleepingTab(ttk.Frame):
             pass
 
         try:
-            if script.exists():
+            settings = {}
+            try:
+                settings = self.app.project.read_settings()
+            except Exception:
                 settings = {}
-                try:
-                    settings = self.app.project.read_settings()
-                except Exception:
-                    settings = {}
 
-                model = settings.get("whisper_model", "medium")
-                mode = settings.get("transcription_mode", "auto")
-                device = "cuda" if mode in ("gpu", "auto") else "cpu"
-
-                env = os.environ.copy()
-                extra_paths = settings.get("extra_cuda_paths", "")
-                if extra_paths:
-                    env["PATH"] = extra_paths + ";" + env.get("PATH", "")
-
-                cmd = [
-                    sys.executable,
-                    str(script),
-                    "--input", str(wav),
-                    "--output-dir", str(self.app.project.transcription_json_dir),
-                    "--model", str(model),
-                    "--device", device,
-                    "--language", "de",
-                ]
-                result = subprocess.run(cmd, capture_output=True, text=True, env=env)
-                if result.returncode == 0 and out.exists():
-                    self.refresh()
-                    self.json_var.set(out.name)
-                    self.make_candidates(auto_only=True)
-                    self._set_status(f"words.json erzeugt: {out.name}")
-                    return
-
-            if not out.exists():
-                out.write_text(json.dumps({"source_file": wav.name, "segments": []}, indent=2, ensure_ascii=False), encoding="utf-8")
+            out = self.bleeping_service.transcribe_wav_to_words_json(
+                self.app.project,
+                wav,
+                model=str(settings.get("whisper_model", "medium")),
+                device=str(settings.get("transcription_mode", "auto")),
+                compute_type=str(settings.get("compute_type", "float16")),
+                extra_cuda_paths=str(settings.get("extra_cuda_paths", "")),
+            )
             self.refresh()
             self.json_var.set(out.name)
             self.make_candidates(auto_only=True)
-            self._set_status(f"Platzhalter-words.json erzeugt: {out.name}")
+            self._set_status(f"words.json erzeugt: {out.name}")
         except Exception as e:
             self._set_status(f"Transkription fehlgeschlagen: {e}")
         finally:

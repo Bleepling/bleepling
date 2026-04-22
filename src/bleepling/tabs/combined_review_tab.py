@@ -73,11 +73,11 @@ class _BleepingTabBridge:
         self.sync_from_tab()
         return bt
 
-    def make_words_json_stub(self):
+    def make_words_json(self):
         bt = self.sync_to_tab()
         if bt is None:
             return None
-        bt.make_words_json_stub()
+        bt.make_words_json()
         self.sync_from_tab()
         return bt
 
@@ -336,7 +336,7 @@ class CombinedReviewTab(HitReviewTab):
         ttk.Label(prep, text="WAV").grid(row=1, column=0, sticky="w", padx=8, pady=4)
         self.wav_combo = ttk.Combobox(prep, textvariable=self.wav_var, state="readonly", width=24)
         self.wav_combo.grid(row=1, column=1, sticky="we", padx=4, pady=4)
-        ttk.Button(prep, text="words.json aus WAV", command=self.make_words_json_stub, style="Accent.TButton").grid(row=1, column=2, sticky="w", padx=6, pady=4)
+        ttk.Button(prep, text="words.json aus WAV", command=self.make_words_json, style="Accent.TButton").grid(row=1, column=2, sticky="w", padx=6, pady=4)
         ttk.Button(prep, text="?", width=3, command=lambda: self._show_info("Vorbereitung", "Zuerst Medium wählen, dann WAV bzw. words.json erzeugen und schließlich die Kandidaten-Datei anlegen." )).grid(row=1, column=5, sticky="e", padx=8, pady=4)
         lists = self._make_bold_labelframe(top, "2) Namenslisten und Regeln")
         lists.grid(row=0, column=1, sticky="nsew", padx=6)
@@ -694,8 +694,8 @@ class CombinedReviewTab(HitReviewTab):
         except Exception:
             pass
 
-    def make_words_json_stub(self):
-        if self._bleeping_bridge().make_words_json_stub() is None:
+    def make_words_json(self):
+        if self._bleeping_bridge().make_words_json() is None:
             return
         self.refresh()
 

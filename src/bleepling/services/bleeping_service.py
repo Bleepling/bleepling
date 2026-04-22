@@ -189,7 +189,7 @@ class BleepingService:
     ) -> Path:
         if not wav_path.exists():
             raise FileNotFoundError(f"WAV-Datei nicht gefunden: {wav_path}")
-        script_path = self._legacy_script_path("transcribe_with_word_timestamps.py")
+        script_path = self._optional_legacy_script_path("transcribe_with_word_timestamps.py")
         extra_paths = [part.strip() for part in str(extra_cuda_paths).split(";") if part.strip()]
         runtime_env = self.environment_service.build_runtime_env(extra_paths)
 
@@ -224,14 +224,24 @@ class BleepingService:
         for selected_device, selected_compute_type in attempts:
             try:
                 self._log(project, f"Transkription startet: device={selected_device}, compute_type={selected_compute_type}, wav={wav_path.name}")
-                self._run_subprocess(build_cmd(selected_device, selected_compute_type), cwd=project.root_path, env=runtime_env)
+                if script_path.exists():
+                    self._run_subprocess(build_cmd(selected_device, selected_compute_type), cwd=project.root_path, env=runtime_env)
+                else:
+                    self._transcribe_with_faster_whisper(
+                        project=project,
+                        wav_path=wav_path,
+                        model=model,
+                        device=selected_device,
+                        compute_type=selected_compute_type,
+                        runtime_env=runtime_env,
+                    )
                 self._log(project, f"Transkription erfolgreich: device={selected_device}, wav={wav_path.name}")
                 output = project.transcription_json_dir / f"{wav_path.stem}.words.json"
                 if not output.exists():
                     raise FileNotFoundError("Die Transkription wurde ausgeführt, aber die words.json wurde nicht gefunden.")
                 return output
             except Exception as exc:
-                details = str(exc)
+                details = self._format_transcription_error(str(exc))
                 errors.append(f"{selected_device}: {details}")
                 self._log(project, f"Transkription fehlgeschlagen: device={selected_device}, details={details}")
                 if requested_mode == "gpu":
@@ -251,6 +261,92 @@ class BleepingService:
             + "\n- ".join(errors)
             + "\n\nBitte die Prüfung im Reiter Einstellungen / Logs ausführen."
         )
+
+    def _format_transcription_error(self, details: str) -> str:
+        cache_markers = (
+            ".cache\\huggingface",
+            ".cache/huggingface",
+            "huggingface",
+            "snapshot_download",
+            "PermissionError",
+            "Zugriff verweigert",
+            "Access is denied",
+        )
+        if any(marker.lower() in details.lower() for marker in cache_markers):
+            return (
+                "Das Whisper-Modell konnte nicht in den HuggingFace-Cache geschrieben oder daraus gelesen werden.\n"
+                "Bitte sicherstellen, dass der Modellcache beschreibbar ist. Standard ist z. B. "
+                r"C:\Users\<Benutzer>\.cache\huggingface. Alternativ kann ein beschreibbarer Cache-Pfad über "
+                "die Umgebungsvariablen HF_HOME oder HF_HUB_CACHE gesetzt werden.\n\n"
+                f"Technische Details:\n{details}"
+            )
+        return details
+
+    def _transcribe_with_faster_whisper(
+        self,
+        project: Project,
+        wav_path: Path,
+        model: str,
+        device: str,
+        compute_type: str,
+        runtime_env: dict[str, str],
+    ) -> Path:
+        try:
+            from faster_whisper import WhisperModel
+        except Exception as exc:
+            raise RuntimeError(
+                "Python-Modul faster-whisper nicht gefunden. Bitte die Prüfung im Reiter Einstellungen / Logs ausführen."
+            ) from exc
+
+        old_path = os.environ.get("PATH", "")
+        if runtime_env.get("PATH"):
+            os.environ["PATH"] = runtime_env["PATH"]
+        try:
+            whisper_model = WhisperModel(model, device=device, compute_type=compute_type)
+            segments_iter, info = whisper_model.transcribe(
+                str(wav_path),
+                language=project.language,
+                word_timestamps=True,
+                vad_filter=False,
+            )
+            segments = []
+            for segment in segments_iter:
+                words = []
+                for word in segment.words or []:
+                    words.append(
+                        {
+                            "word": word.word,
+                            "start": float(word.start) if word.start is not None else None,
+                            "end": float(word.end) if word.end is not None else None,
+                            "probability": float(word.probability) if word.probability is not None else None,
+                        }
+                    )
+                segments.append(
+                    {
+                        "id": segment.id,
+                        "start": float(segment.start),
+                        "end": float(segment.end),
+                        "text": segment.text,
+                        "words": words,
+                    }
+                )
+        finally:
+            os.environ["PATH"] = old_path
+
+        project.transcription_json_dir.mkdir(parents=True, exist_ok=True)
+        output = project.transcription_json_dir / f"{wav_path.stem}.words.json"
+        payload = {
+            "source_file": wav_path.name,
+            "language": getattr(info, "language", project.language),
+            "language_probability": getattr(info, "language_probability", None),
+            "duration": getattr(info, "duration", None),
+            "model": model,
+            "device": device,
+            "compute_type": compute_type,
+            "segments": segments,
+        }
+        output.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+        return output
 
     def generate_candidate_file_from_words_json(self, project: Project, words_json_path: Path) -> Path:
         if not words_json_path.exists():
@@ -621,6 +717,10 @@ class BleepingService:
         if not path.exists():
             raise FileNotFoundError(f"Legacy-Skript nicht gefunden: {path}")
         return path
+
+    def _optional_legacy_script_path(self, script_name: str) -> Path:
+        root = Path(__file__).resolve().parents[3]
+        return root / "legacy_reference" / "v5_scripts" / script_name
 
     def _run_subprocess(self, cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> None:
         result = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, env=env)

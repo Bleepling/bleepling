@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import threading
 import queue
+import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
@@ -549,6 +550,39 @@ class TargetedEditTab(ttk.Frame):
         self.proc = None
         return rc, "\n".join(err).strip()
 
+    def _move_render_result(self, source: Path, target: Path) -> None:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        last_error: Exception | None = None
+        for _ in range(30):
+            try:
+                os.replace(source, target)
+                return
+            except PermissionError as exc:
+                last_error = exc
+                if target.exists() and target.stat().st_size > 0:
+                    return
+                time.sleep(0.2)
+            except Exception as exc:
+                last_error = exc
+                break
+        if target.exists() and target.stat().st_size > 0:
+            return
+        if last_error is not None:
+            raise last_error
+
+    def _cleanup_temp_file(self, path: Path | None) -> None:
+        if not path:
+            return
+        for _ in range(30):
+            try:
+                if path.exists():
+                    path.unlink()
+                return
+            except PermissionError:
+                time.sleep(0.2)
+            except Exception:
+                return
+
     def _worker(self, media: Path, out_file: Path, prepend: str, append: str, intervals):
         temp_audio = None
         temp_targeted = None
@@ -613,7 +647,8 @@ class TargetedEditTab(ttk.Frame):
 
             if have_pre or have_post:
                 self.render_queue.put({"kind": "progress", "percent": 72.0 if intervals else 8.0, "label": "Schritt 2/2: Vor- und Nachspann werden gemeinsam gerendert"})
-                temp_concat_media = out_dir / f"{out_file.stem}.tmp_concat_media.mp4"
+                temp_concat_media = None
+                concat_output = out_file
 
                 inputs = []
                 filter_parts = []
@@ -668,14 +703,14 @@ class TargetedEditTab(ttk.Frame):
                 ]
                 cmd_video += encode_args
                 final_duration = duration + (pre_seconds if have_pre else 0.0) + (post_seconds if have_post else 0.0)
-                cmd_video += ["-c:a", "aac", "-b:a", audio_bitrate, "-movflags", "+faststart", str(temp_concat_media)]
+                cmd_video += ["-c:a", "aac", "-b:a", audio_bitrate, "-movflags", "+faststart", str(concat_output)]
                 rc, err = self._run_progress_cmd(cmd_video, max(final_duration, 1.0))
                 if rc != 0:
                     raise RuntimeError((err or "Fehler beim Zusammensetzen von Vor- und Nachspann")[:5000])
-                shutil.move(str(temp_concat_media), str(out_file))
             else:
                 if intervals:
-                    shutil.move(str(working_video), str(out_file))
+                    self._move_render_result(working_video, out_file)
+                    temp_targeted = None
                 else:
                     raise RuntimeError("Es wurden keine Änderungen angegeben.")
 
@@ -689,11 +724,7 @@ class TargetedEditTab(ttk.Frame):
             self.render_queue.put({"kind": "error", "message": f"Rendern fehlgeschlagen: {e}"})
         finally:
             for temp in (temp_audio, temp_targeted, temp_concat_media):
-                try:
-                    if temp and temp.exists():
-                        temp.unlink()
-                except Exception:
-                    pass
+                self._cleanup_temp_file(temp)
 
     def render_changes(self):
         p = self._project()

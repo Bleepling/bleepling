@@ -5,6 +5,7 @@ import queue
 import shutil
 import subprocess
 import threading
+import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, simpledialog, ttk
@@ -140,7 +141,7 @@ class FFmpegTab(ttk.Frame):
         return getattr(p, "output_video_dir", p.root_path / "04_output" / "videos")
 
     def _output_audio_dir(self, p) -> Path:
-        return p.root_path / "04_output" / "audio"
+        return getattr(p, "output_audio_dir", p.root_path / "04_output" / "audio")
 
     def _ffmpeg(self):
         return find_ffmpeg()
@@ -673,6 +674,19 @@ class FFmpegTab(ttk.Frame):
         self.proc = None
         return subprocess.CompletedProcess(cmd, rc, stdout=stdout, stderr=stderr)
 
+    def _cleanup_temp_file(self, path: Path | None) -> None:
+        if not path:
+            return
+        for _ in range(30):
+            try:
+                if path.exists():
+                    path.unlink()
+                return
+            except PermissionError:
+                time.sleep(0.2)
+            except Exception:
+                return
+
     def _poll_render_queue(self):
         try:
             while True:
@@ -740,15 +754,10 @@ class FFmpegTab(ttk.Frame):
             if self.cancel_requested.is_set():
                 raise RuntimeError("__cancelled__")
             if rc2 != 0: raise RuntimeError((err2 or "Fehler in Schritt 2")[:5000])
-            try:
-                if temp_audio.exists(): temp_audio.unlink()
-            except Exception: pass
+            self._cleanup_temp_file(temp_audio)
             self.render_queue.put({"kind":"done","message":f"Gebleeptes Video erzeugt: {out.name}\nAusgabeordner: {out_dir}"})
         except Exception as e:
-            try:
-                if temp_audio.exists(): temp_audio.unlink()
-            except Exception:
-                pass
+            self._cleanup_temp_file(temp_audio if "temp_audio" in locals() else None)
             try:
                 if out.exists() and self.cancel_requested.is_set():
                     out.unlink()

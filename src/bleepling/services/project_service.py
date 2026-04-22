@@ -20,6 +20,7 @@ class ProjectService:
         "03_processing/bleep_lists",
         "03_processing/cleaned",
         "03_processing/name_candidates",
+        "04_output/audio",
         "04_output/videos",
         "04_output/titlecards",
         "05_logs",

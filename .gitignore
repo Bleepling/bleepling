@@ -31,6 +31,11 @@ coverage/
 htmlcov/
 .coverage
 .coverage.*
+_tmp_function_test/
+_tmp_gui_full_test/
+test_material/
+tools/function_smoke_test.py
+tools/gui_full_test.py
 
 # Jupyter / editors / OS
 .ipynb_checkpoints/
@@ -60,3 +65,6 @@ desktop.ini
 
 # Optional local archives
 *.zip
+
+# Local Word working copies of manuals
+*.docx

@@ -79,6 +79,10 @@ class Project:
         return self.root_path / "04_output" / "videos"
 
     @property
+    def output_audio_dir(self) -> Path:
+        return self.root_path / "04_output" / "audio"
+
+    @property
     def transcription_json_dir(self) -> Path:
         return self.root_path / "02_transcription" / "json"
 

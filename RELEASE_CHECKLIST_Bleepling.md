@@ -23,7 +23,7 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] Reiter `Titelkarten` ist weiterhin in Code, Doku und Release-Unterlagen konsistent berücksichtigt
 - [ ] zweite Dachzeile sowie die erweiterten Text- und Vorschaufunktionen im Reiter `Titelkarten` sind in Code, Doku und Release-Unterlagen konsistent berücksichtigt
 - [ ] Reiter `Einstellungen / Logs` ist in Beschriftung, Hilfe und sichtbaren Einrichtungsbefehlen konsistent dokumentiert
-- [ ] neue 1.5.1-Funktionen für Projektlöschung, Titelkarten-Sicherheitsabfrage, interaktive Titelkarten-Positionierung und zentrale Render-Parameter sind in Code, Doku und Release-Unterlagen konsistent berücksichtigt
+- [ ] neue 1.5.2-Korrekturen für echte `words.json`-Erzeugung, getrennte Audioausgabe, robustere temporäre Renderdateien und Startskripte sind in Code, Doku und Release-Unterlagen konsistent berücksichtigt
 
 ## 3. Aufräumen vor Veröffentlichung
 
@@ -81,6 +81,8 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] freier PNG-Export funktioniert
 - [ ] Titelkarten mit leerem Startzustand, mit Hintergrundbild und mit Logos testweise durchlaufen
 - [ ] typischer Standardworkflow ist praktisch funktionsfähig
+- [ ] `words.json` aus WAV erzeugt echte Transkriptionsdaten und keine Platzhalterdatei
+- [ ] gebleepte Audioexporte landen in `04_output/audio`
 - [ ] keine offensichtlichen Platzhalter oder veralteten Texte in Oberfläche und Doku
 
 ## 7. Dokumentation
@@ -121,6 +123,7 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] Release-Notiz für 1.5.0 erwähnt die sichtbaren Verbesserungen in `Titelkarten` und `Gezielte Nachbearbeitung`
 - [ ] Release-Notiz für 1.5.0 erwähnt die wirksame Abbruchlogik bei längeren Renderläufen
 - [ ] Release-Notiz für 1.5.1 erwähnt interaktive Titelkartenfelder, zentrale Render-Parameter und sichere Projekt-/Exportdialoge
+- [ ] Release-Notiz für 1.5.2 erwähnt echte `words.json`-Erzeugung, getrennte Audioausgabe und robustere Render-/Startabläufe
 - [ ] Release-Notiz erwähnt weiterhin den Reiter `Schnitt & Kapitel`, soweit dies für die Gesamteinordnung des aktuellen Funktionsstands sinnvoll ist
 
 ## Notiz

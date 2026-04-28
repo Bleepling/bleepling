@@ -24,6 +24,7 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] zweite Dachzeile sowie die erweiterten Text- und Vorschaufunktionen im Reiter `Titelkarten` sind in Code, Doku und Release-Unterlagen konsistent berücksichtigt
 - [ ] Reiter `Einstellungen / Logs` ist in Beschriftung, Hilfe und sichtbaren Einrichtungsbefehlen konsistent dokumentiert
 - [ ] neue 1.5.2-Korrekturen für echte `words.json`-Erzeugung, getrennte Audioausgabe, robustere temporäre Renderdateien und Startskripte sind in Code, Doku und Release-Unterlagen konsistent berücksichtigt
+- [ ] neue 1.5.3-Umstellung auf integriertes Markdown-Handbuch, Handbuch-Viewer und HTML-Export ist in Code, Doku und Release-Unterlagen konsistent berücksichtigt
 
 ## 3. Aufräumen vor Veröffentlichung
 
@@ -87,7 +88,7 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 
 ## 7. Dokumentation
 
-- [ ] Benutzerdokumentation ist beigefügt oder verlinkt
+- [ ] Benutzerdokumentation ist als Markdown-Datei im Projekt vorhanden oder in der Anwendung erreichbar
 - [ ] README beschreibt Installation und Start korrekt
 - [ ] typische Arbeitsabläufe sind nachvollziehbar beschrieben
 - [ ] Einschränkungen und Grenzen des Projekts sind dokumentiert
@@ -124,6 +125,7 @@ Diese Checkliste dient dazu, einen öffentlichen Release von **Bleepling** vor d
 - [ ] Release-Notiz für 1.5.0 erwähnt die wirksame Abbruchlogik bei längeren Renderläufen
 - [ ] Release-Notiz für 1.5.1 erwähnt interaktive Titelkartenfelder, zentrale Render-Parameter und sichere Projekt-/Exportdialoge
 - [ ] Release-Notiz für 1.5.2 erwähnt echte `words.json`-Erzeugung, getrennte Audioausgabe und robustere Render-/Startabläufe
+- [ ] Release-Notiz für 1.5.3 erwähnt integriertes Anwenderhandbuch, Handbuch-Viewer und Wegfall ausgelieferter PDF-/DOCX-Fassungen
 - [ ] Release-Notiz erwähnt weiterhin den Reiter `Schnitt & Kapitel`, soweit dies für die Gesamteinordnung des aktuellen Funktionsstands sinnvoll ist
 
 ## Notiz

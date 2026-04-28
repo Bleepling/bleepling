@@ -126,6 +126,7 @@ class MediaTab(ttk.Frame):
             "Times-Dateien, Arbeitsvideos, Output-Dateien und Titelkarten.\n\n"
             "Mit 'Liste aktualisieren' werden die relevanten Projektordner neu eingelesen. "
             "Mit 'Ordner öffnen' springst du direkt in den passenden Ordner des aktuellen Abschnitts.",
+            handbook_anchor="7. Reiter Medien",
         )
 
     def _append_section(self, title: str, directory: Path, exts: set[str], files: list[Path] | None = None):

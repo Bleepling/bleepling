@@ -337,7 +337,7 @@ class CombinedReviewTab(HitReviewTab):
         self.wav_combo = ttk.Combobox(prep, textvariable=self.wav_var, state="readonly", width=24)
         self.wav_combo.grid(row=1, column=1, sticky="we", padx=4, pady=4)
         ttk.Button(prep, text="words.json aus WAV", command=self.make_words_json, style="Accent.TButton").grid(row=1, column=2, sticky="w", padx=6, pady=4)
-        ttk.Button(prep, text="?", width=3, command=lambda: self._show_info("Vorbereitung", "Zuerst Medium wählen, dann WAV bzw. words.json erzeugen und schließlich die Kandidaten-Datei anlegen." )).grid(row=1, column=5, sticky="e", padx=8, pady=4)
+        ttk.Button(prep, text="?", width=3, command=lambda: self._show_info("Vorbereitung", "Zuerst Medium wählen, dann WAV bzw. words.json erzeugen und schließlich die Kandidaten-Datei anlegen.", "9.1 Bereich 1 – Vorbereitung" )).grid(row=1, column=5, sticky="e", padx=8, pady=4)
         lists = self._make_bold_labelframe(top, "2) Namenslisten und Regeln")
         lists.grid(row=0, column=1, sticky="nsew", padx=6)
         lists.columnconfigure(0, weight=1)
@@ -372,7 +372,7 @@ class CombinedReviewTab(HitReviewTab):
             list_bar2.columnconfigure(c, weight=1)
         ttk.Button(list_bar2, text="Blocklist aus Kandidaten füllen", command=self.fill_blocklist_from_candidates, style="Accent.TButton").grid(row=0, column=0, sticky="ew", padx=(0, 4), pady=(0, 4))
         ttk.Button(list_bar2, text="Allowlist aus Kandidaten füllen", command=self.fill_allowlist_from_candidates, style="Accent.TButton").grid(row=0, column=1, sticky="ew", padx=4, pady=(0, 4))
-        ttk.Button(list_bar2, text="?", width=3, command=lambda: self._show_info("Namenslisten und Regeln", "Blocklist und Allowlist werden wie bisher gepflegt. Die Allowlist hat bei der Auswertung Vorrang." )).grid(row=0, column=2, sticky="e", padx=(4, 0), pady=(0, 4))
+        ttk.Button(list_bar2, text="?", width=3, command=lambda: self._show_info("Namenslisten und Regeln", "Blocklist und Allowlist werden wie bisher gepflegt. Die Allowlist hat bei der Auswertung Vorrang.", "9.2 Bereich 2 – Namenslisten und Regeln" )).grid(row=0, column=2, sticky="e", padx=(4, 0), pady=(0, 4))
         ttk.Button(list_bar2, text="Blocklist leeren", command=self.clear_blocklist).grid(row=1, column=0, sticky="ew", padx=(0, 4))
         ttk.Button(list_bar2, text="Allowlist leeren", command=self.clear_allowlist).grid(row=1, column=1, sticky="ew", padx=4)
         ttk.Button(list_bar2, text="Listen speichern", command=self.save_lists, style="Accent.TButton").grid(row=1, column=2, sticky="ew", padx=(4, 0))
@@ -383,7 +383,7 @@ class CombinedReviewTab(HitReviewTab):
         self.candidate_combo = ttk.Combobox(cand, textvariable=self.candidate_var, state="readonly", width=26)
         self.candidate_combo.grid(row=0, column=1, sticky="we", padx=4, pady=(8, 4))
         ttk.Button(cand, text="Datei laden", command=self.choose_candidate, style="Accent.TButton").grid(row=0, column=2, padx=8, pady=(8, 4))
-        ttk.Button(cand, text="?", width=3, command=lambda: self._show_info("Kandidaten prüfen", "Die Auswertung verwendet die vorhandene Bleeping-Logik und lädt das Ergebnis direkt in den unteren Prüfbereich." )).grid(row=1, column=2, sticky="e", padx=8, pady=(0, 4))
+        ttk.Button(cand, text="?", width=3, command=lambda: self._show_info("Kandidaten prüfen", "Die Auswertung verwendet die vorhandene Bleeping-Logik und lädt das Ergebnis direkt in den unteren Prüfbereich.", "9.3 Bereich 3 – Kandidaten prüfen" )).grid(row=1, column=2, sticky="e", padx=8, pady=(0, 4))
         ttk.Label(cand, text="Blocklist-Fuzzy %").grid(row=2, column=0, sticky="w", padx=8, pady=4)
         ttk.Spinbox(cand, from_=50, to=100, textvariable=self.block_thr, width=5).grid(row=2, column=1, sticky="w", padx=4)
         ttk.Label(cand, text="Allowlist-Fuzzy %").grid(row=3, column=0, sticky="w", padx=8, pady=4)
@@ -479,7 +479,7 @@ class CombinedReviewTab(HitReviewTab):
         ttk.Label(bleepf, text="Nachlauf (ms)").grid(row=1, column=2, sticky="w", pady=(6, 0))
         ttk.Spinbox(bleepf, from_=0, to=2000, increment=10, textvariable=self.bleep_post_ms_var, width=8).grid(row=1, column=3, sticky="w", padx=(6, 16), pady=(6, 0))
         ttk.Button(bleepf, text="Anwenden", style="Accent.TButton", command=self._apply_bleep_params).grid(row=0, column=4, rowspan=2, sticky="ns", padx=(0, 6))
-        ttk.Button(bleepf, text="?", width=3, command=lambda: self._show_info("Bleep-Parameter", "Diese Werte sind die globalen Grundparameter für die Prüfung im Reiter und für das spätere Rendern. Vorlauf und Nachlauf gelten zunächst für alle Treffer. Die Tasten im Bereich Feintuning ändern zusätzlich den Beginn oder das Ende des jeweils aktiven einzelnen Treffers. Individuelle Korrekturen pro Treffer bleiben erhalten, wenn die globalen Bleep-Parameter neu angewendet werden." )).grid(row=0, column=5, rowspan=2, sticky="ne")
+        ttk.Button(bleepf, text="?", width=3, command=lambda: self._show_info("Bleep-Parameter", "Diese Werte sind die globalen Grundparameter für die Prüfung im Reiter und für das spätere Rendern. Vorlauf und Nachlauf gelten zunächst für alle Treffer. Die Tasten im Bereich Feintuning ändern zusätzlich den Beginn oder das Ende des jeweils aktiven einzelnen Treffers. Individuelle Korrekturen pro Treffer bleiben erhalten, wenn die globalen Bleep-Parameter neu angewendet werden.", "10.4 Bereich Bleep-Parameter" )).grid(row=0, column=5, rowspan=2, sticky="ne")
         player_box = ttk.LabelFrame(right, text="Audio-Vorschau", padding=10)
         player_box.grid(row=3, column=0, sticky="nsew", padx=10, pady=(10, 10))
         player_box.columnconfigure(0, weight=1)
@@ -663,8 +663,8 @@ class CombinedReviewTab(HitReviewTab):
     def _bleeping(self):
         return self._bleeping_bridge().tab()
 
-    def _show_info(self, title: str, text: str):
-        show_help_dialog(self, title, text)
+    def _show_info(self, title: str, text: str, handbook_anchor: str | None = None):
+        show_help_dialog(self, title, text, handbook_anchor=handbook_anchor)
     def _sync_to_bleeping(self):
         self._bleeping_bridge().sync_to_tab()
 

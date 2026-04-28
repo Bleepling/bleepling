@@ -558,11 +558,11 @@ class BleepingTab(ttk.Frame):
             pass
 
 
-    def _toggle_help(self, attr_name: str):
+    def _toggle_help(self, attr_name: str, handbook_anchor: str | None = None):
         help_text = getattr(self, attr_name, "")
         if not help_text:
             return
-        show_help_dialog(self, "Hilfe", help_text)
+        show_help_dialog(self, "Hilfe", help_text, handbook_anchor=handbook_anchor)
 
     def _read_block_entries_from_widget(self) -> list[str]:
         return [x.strip() for x in self.block_text.get("1.0", "end").splitlines() if x.strip()]
@@ -788,7 +788,7 @@ class BleepingTab(ttk.Frame):
         prep_helpbar = ttk.Frame(top)
         prep_helpbar.grid(row=1, column=3, columnspan=3, sticky="e", padx=8, pady=(2, 4))
         ttk.Label(prep_helpbar, text="Hilfe zu Vorbereitung").pack(side="left")
-        ttk.Button(prep_helpbar, text="?", width=3, command=lambda: self._toggle_help("prep_help_label")).pack(side="left", padx=(6, 0))
+        ttk.Button(prep_helpbar, text="?", width=3, command=lambda: self._toggle_help("prep_help_label", "9.1 Bereich 1 – Vorbereitung")).pack(side="left", padx=(6, 0))
         self.prep_help_label = "Ablauf in kurz: 1) Video oder WAV vorbereiten  2) words.json erzeugen  3) Kandidaten-Datei erzeugen  4) Kandidaten auswerten  5) In der Vorschau entscheiden  6) Times-Datei erzeugen.\n\nKandidaten-Datei = Trefferdatei mit Zeitstempel, Nachname und Kontext. Das ist der normale Arbeitsstand für die Prüfung.\n\nTeilnehmerliste = reine Namensliste ohne Zeitpunkte. Sie dient nur als Hilfe für die Blocklist-Vorlage und erzeugt noch keine Times-Datei.\n\nBei Teilnehmerlisten können Nachnamen, Vornamen oder beide gemeinsam übernommen werden."
 
         mid = ttk.Frame(self)
@@ -838,7 +838,7 @@ class BleepingTab(ttk.Frame):
 
         ttk.Label(participant_bar, text="").pack(side="left", expand=True, fill="x")
         ttk.Label(participant_bar, text="Hilfe zu Namenslisten und Regeln").pack(side="left", padx=(18, 6))
-        ttk.Button(participant_bar, text="?", width=3, command=lambda: self._toggle_help("lists_help_label")).pack(side="left")
+        ttk.Button(participant_bar, text="?", width=3, command=lambda: self._toggle_help("lists_help_label", "9.2 Bereich 2 – Namenslisten und Regeln")).pack(side="left")
 
         self.lists_help_label = "Teilnehmerlisten können als TXT, CSV, XLSX, DOCX oder PDF importiert werden. Ergebnis ist immer nur eine Namensbasis für die Blocklist-Vorlage.\n\nDie Allowlist ist stärker: Ein dort eingetragener Name gewinnt bei der späteren Auswertung gegen die Blocklist.\n\nBlocklist = Namen, die besonders genau geprüft werden sollen. Allowlist = Namen oder Schreibweisen, die nicht gebleept werden sollen.\n\nBei Teilnehmerlisten können Nachnamen, Vornamen oder beide gemeinsam übernommen werden. Die Blocklist erzwingt keinen Bleep automatisch; maßgeblich ist immer die spätere Auswertung."
 
@@ -865,7 +865,7 @@ class BleepingTab(ttk.Frame):
         candidate_helpbar = ttk.Frame(right)
         candidate_helpbar.grid(row=3, column=0, columnspan=4, sticky="se", padx=8, pady=(10, 8))
         ttk.Label(candidate_helpbar, text="Hilfe zu Kandidaten prüfen").pack(side="left")
-        ttk.Button(candidate_helpbar, text="?", width=3, command=lambda: self._toggle_help("candidate_help_label")).pack(side="left", padx=(6, 0))
+        ttk.Button(candidate_helpbar, text="?", width=3, command=lambda: self._toggle_help("candidate_help_label", "9.3 Bereich 3 – Kandidaten prüfen")).pack(side="left", padx=(6, 0))
 
         self.candidate_help_label = "Auswertung starten vergleicht die Trefferdatei mit Blocklist und Allowlist und füllt damit die Vorschau.\n\nSchnell-Nachbleepen erzeugt nur zusätzliche Zeitpunkte für einen zweiten Korrekturdurchgang."
 
@@ -881,7 +881,7 @@ class BleepingTab(ttk.Frame):
         ttk.Button(preview_bar, text="Times-Datei aus Vorschau", command=self.create_times_from_preview, style="Accent.TButton").pack(side="left", padx=8)
         ttk.Label(preview_bar, text="").pack(side="left", expand=True, fill="x")
         ttk.Label(preview_bar, text="Hilfe zu Vorschau, Entscheidung und Times-Datei").pack(side="left", padx=(12, 6))
-        ttk.Button(preview_bar, text="?", width=3, command=lambda: self._toggle_help("preview_help_label")).pack(side="left", padx=(0, 0))
+        ttk.Button(preview_bar, text="?", width=3, command=lambda: self._toggle_help("preview_help_label", "9.4 Bereich 4 – Trefferliste, Feinprüfung und Times-Datei")).pack(side="left", padx=(0, 0))
 
         self.preview_help_label = "Hier wird entschieden, was am Ende tatsächlich gebleept wird. Erst mit \"Times-Datei aus Vorschau\" entsteht die spätere Bleepliste.\n\nIn Allowlist = Schreibweise merken. Erlauben = Treffer freigeben und aus der offenen Prüfung nehmen. Bleepen = Treffer für die Times-Datei vormerken."
 

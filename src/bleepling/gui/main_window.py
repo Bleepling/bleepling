@@ -15,6 +15,7 @@ from bleepling.tabs.hit_review_tab import HitReviewTab
 from bleepling.tabs.settings_tab import SettingsTab
 from bleepling.tabs.titlecards_tab import TitleCardsTab
 from bleepling.tabs.combined_review_tab import CombinedReviewTab
+from bleepling.utils.handbook_dialog import open_handbook
 from PIL import Image, ImageTk
 
 
@@ -145,6 +146,13 @@ class BleeplingApp(tk.Tk):
 
         right = ttk.Frame(self.header)
         right.pack(side="right", anchor="ne")
+
+        self.handbook_btn = ttk.Button(
+            right,
+            text="Handbuch öffnen",
+            command=self.open_handbook,
+        )
+        self.handbook_btn.pack(side="left", padx=(0, 8), pady=(60, 0), anchor="n")
 
         self.save_btn = ttk.Button(
             right,
@@ -440,6 +448,9 @@ class BleeplingApp(tk.Tk):
             self.set_status("Projekt gespeichert.")
         except Exception as e:
             self.set_status(f"Projekt speichern fehlgeschlagen: {e}")
+
+    def open_handbook(self, anchor: str | None = None):
+        return open_handbook(self, anchor=anchor)
 
     def set_running(self, is_running: bool):
         if is_running:

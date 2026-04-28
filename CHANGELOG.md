@@ -4,6 +4,19 @@ Alle nennenswerten Änderungen an **Bleepling** sollen in dieser Datei dokumenti
 
 Die Struktur orientiert sich an einer einfachen, für Open-Source-Projekte gut lesbaren Versionshistorie.
 
+## [1.5.3] - 2026-04-28
+
+### Hinzugefügt
+- integrierter Handbuch-Viewer in der Anwendung mit Suche, Kapitelsprüngen und HTML-Export
+- globaler Button **„Handbuch öffnen“** in der Kopfzeile der App
+- direkte Verknüpfung vieler Fragezeichen-Hilfen mit den passenden Kapiteln im Anwenderhandbuch
+
+### Geändert
+- `docs/Bleepling_Benutzerhandbuch.md` ist jetzt die zentrale Handbuchquelle im Repository
+- Inhaltsverzeichnis und Kapitelanker des Anwenderhandbuchs wurden vereinheitlicht, damit Sprungmarken in App und HTML-Export konsistent funktionieren
+- Release-Workflow liefert keine offiziellen PDF- oder DOCX-Fassungen des Anwenderhandbuchs mehr aus
+- README, Security-, Contributing- und Release-Unterlagen auf den Stand **1.5.3** fortgeschrieben
+
 ## [1.5.2] - 2026-04-22
 
 ### Geändert
@@ -11,7 +24,7 @@ Die Struktur orientiert sich an einer einfachen, für Open-Source-Projekte gut l
 - Transkription nutzt `faster-whisper` direkt als Fallback, wenn das alte Legacy-Transkriptionsskript nicht vorhanden ist
 - gebleepte Audioexporte werden klar getrennt in `04_output/audio` abgelegt; Videoexporte bleiben in `04_output/videos`
 - Start-BAT-Dateien vereinheitlicht; der Debug-Start zeigt Arbeitsordner, `PYTHONPATH` und Python-Version
-- Benutzerdokumentation als PDF auf Version 1.5.2 aktualisiert
+- Benutzerdokumentation auf Version 1.5.2 aktualisiert
 
 ### Behoben
 - kombinierter Prüfworkflow nutzt wieder denselben echten `words.json`-Erzeugungsweg wie der Reiter **„Prüfen & Entscheiden“**

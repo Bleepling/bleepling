@@ -241,8 +241,8 @@ class CutTab(ttk.Frame):
 
 
 
-    def _show_help_dialog(self, title: str, body: str):
-        show_help_dialog(self, title, body)
+    def _show_help_dialog(self, title: str, body: str, handbook_anchor: str | None = None):
+        show_help_dialog(self, title, body, handbook_anchor=handbook_anchor)
 
     def show_help_sources(self):
         self._show_help_dialog(
@@ -253,7 +253,8 @@ class CutTab(ttk.Frame):
             "1. Projektvideos hinzufügen\n"
             "2. Reihenfolge prüfen\n"
             "3. Danach das Arbeitsvideo bilden\n\n"
-            "Achte darauf, dass du nur die Videos auswählst, die wirklich in denselben Arbeitsgang gehören."
+            "Achte darauf, dass du nur die Videos auswählst, die wirklich in denselben Arbeitsgang gehören.",
+            handbook_anchor="8.3 Bereich 1 – Quellvideos und Reihenfolge",
         )
 
     def show_help_working_video(self):
@@ -271,7 +272,8 @@ class CutTab(ttk.Frame):
             "4. Danach das Schnittfenster öffnen\n\n"
             "Wenn bereits ein passendes Arbeitsvideo vorhanden ist, kann es wiederverwendet werden. "
             "Das ist besonders hilfreich, wenn du später im selben Projekt eine andere Videozusammenstellung "
-            "oder einen früheren Arbeitsstand weiterbearbeiten möchtest."
+            "oder einen früheren Arbeitsstand weiterbearbeiten möchtest.",
+            handbook_anchor="8.4 Bereich 2 – Arbeitsvideo und Zielordner",
         )
 
     def show_help_marks_main(self):
@@ -283,7 +285,8 @@ class CutTab(ttk.Frame):
             "1. Schnittfenster öffnen\n"
             "2. Start- und Endmarke dort setzen\n"
             "3. Werte hier kontrollieren\n\n"
-            "Die Anzeige hier ist vor allem zur Kontrolle und für schnelle Nachjustierungen gedacht."
+            "Die Anzeige hier ist vor allem zur Kontrolle und für schnelle Nachjustierungen gedacht.",
+            handbook_anchor="8.5 Bereich 3 – Vorschau, Position und Marken",
         )
 
     def show_help_clip_main(self):
@@ -295,7 +298,8 @@ class CutTab(ttk.Frame):
             "1. Marken setzen\n"
             "2. Titel prüfen oder anpassen\n"
             "3. Clip anlegen\n"
-            "4. Bei Bedarf später aktualisieren oder löschen"
+            "4. Bei Bedarf später aktualisieren oder löschen",
+            handbook_anchor="8.6 Bereich 4 – Clip anlegen und benennen",
         )
 
     def show_help_clip_list(self):
@@ -307,14 +311,16 @@ class CutTab(ttk.Frame):
             "1. Clips anlegen\n"
             "2. Einträge in der Liste kontrollieren\n"
             "3. Ausgewählten Clip oder alle Clips erzeugen\n\n"
-            "Die erzeugten Clips landen im Clip-Zielordner des Projekts."
+            "Die erzeugten Clips landen im Clip-Zielordner des Projekts.",
+            handbook_anchor="8.7 Bereich 5 – Clip-Liste und Erzeugung",
         )
 
     def show_help_cutwindow_work(self):
         self._show_help_dialog(
             "Hilfe – Arbeitsvideo und Zielordner",
             "Oben siehst du, mit welchem Arbeitsvideo du gerade arbeitest und in welchen Ordner die fertigen Clips geschrieben werden.\n\n"
-            "Das Schnittfenster bezieht sich immer auf dieses Arbeitsvideo."
+            "Das Schnittfenster bezieht sich immer auf dieses Arbeitsvideo.",
+            handbook_anchor="8.4 Bereich 2 – Arbeitsvideo und Zielordner",
         )
 
     def show_help_cutwindow_preview(self):
@@ -327,7 +333,8 @@ class CutTab(ttk.Frame):
             "2. Startmarke setzen\n"
             "3. Zur Endstelle navigieren\n"
             "4. Endmarke setzen\n"
-            "5. Danach rechts den Clip anlegen"
+            "5. Danach rechts den Clip anlegen",
+            handbook_anchor="8.5 Bereich 3 – Vorschau, Position und Marken",
         )
 
     def show_help_cutwindow_clip(self):
@@ -335,7 +342,8 @@ class CutTab(ttk.Frame):
             "Hilfe – Aktueller Clip",
             "Rechts benennst du den aktuellen Clip und legst ihn aus den gesetzten Marken an. "
             "Außerdem kannst du vorhandene Clip-Einträge aktualisieren oder löschen.\n\n"
-            "Wenn ein sinnvoller Dateiname vorgeschlagen wird, kannst du ihn übernehmen oder anpassen."
+            "Wenn ein sinnvoller Dateiname vorgeschlagen wird, kannst du ihn übernehmen oder anpassen.",
+            handbook_anchor="8.6 Bereich 4 – Clip anlegen und benennen",
         )
     def _asset(self, name: str) -> Path:
         return Path(__file__).resolve().parents[3] / "assets" / name

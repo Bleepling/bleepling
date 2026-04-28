@@ -25,6 +25,20 @@ HELP = {
     "Render-Skalierung": "Legt die Ausgabeauflösung fest.\n\nOriginalgröße beibehalten: verändert die Auflösung nicht; sicherer Standard für gezielte Nachbearbeitung.\n1280 px Breite: kleinere Web-Dateien, bei großen Quellen weniger Details.\n1920 px Breite: Full-HD-orientiert; kann kleine Quellen unnötig hochskalieren.",
 }
 
+HELP_HANDBOOK_ANCHORS = {
+    "Whisper-Modell": "13.3 Bereich „Transkription, GPU, VLC und Darstellung“",
+    "Compute-Type": "13.3 Bereich „Transkription, GPU, VLC und Darstellung“",
+    "Zusätzliche CUDA-Pfade": "13.7 Installations-CMD, CUDA-/PATH-CMD und Zusatzpfade",
+    "Transkriptionsmodus": "13.3 Bereich „Transkription, GPU, VLC und Darstellung“",
+    "Theme": "13.3 Bereich „Transkription, GPU, VLC und Darstellung“",
+    "Render-Backend": "13.3a Bereich „Rendern / Ausgabe“",
+    "Textgröße": "13.3 Bereich „Transkription, GPU, VLC und Darstellung“",
+    "Render-Qualität": "13.3a Bereich „Rendern / Ausgabe“",
+    "Render-Preset": "13.3a Bereich „Rendern / Ausgabe“",
+    "Render-Audio-Bitrate": "13.3a Bereich „Rendern / Ausgabe“",
+    "Render-Skalierung": "13.3a Bereich „Rendern / Ausgabe“",
+}
+
 RENDER_SCALE_OPTIONS = [
     "Originalgröße beibehalten",
     "1280 px Breite (kleiner für Web)",
@@ -46,6 +60,7 @@ class SettingsTab(ttk.Frame):
         self.app = app
         self.environment_service = EnvironmentService()
         self._details = {}
+        self._current_help_anchor: str | None = None
         self._suspend_live_updates = False
         self._checks_wait_win = None
         self._checks_wait_img = None
@@ -155,6 +170,13 @@ class SettingsTab(ttk.Frame):
         self.helpbox.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
         self.helpbox.insert("1.0", "Hier erscheinen einfache Erklärungen und konkrete Hinweise.")
         self.helpbox.config(state="disabled")
+        self.help_handbook_btn = ttk.Button(
+            help_wrap,
+            text="Passendes Kapitel im Handbuch öffnen",
+            command=self.open_current_help_anchor,
+            state="disabled",
+        )
+        self.help_handbook_btn.grid(row=2, column=0, sticky="e", padx=8, pady=(0, 8))
         self._set_general_commands_text(resolve_cuda_paths=False)
         self._bind_live_updates()
 
@@ -369,7 +391,8 @@ class SettingsTab(ttk.Frame):
             "- Whisper-Modell: Ausgewogen\n"
             "- Compute-Type: float16\n"
             "- Render-Backend: auto oder gpu\n"
-            "- Textgröße: normal oder etwas größer"
+            "- Textgröße: normal oder etwas größer",
+            handbook_anchor="13.4 Prüfung und Diagnose",
         )
         self._set_general_commands_text(resolve_cuda_paths=True)
         self.app.set_status("Prüfung für Transkription, GPU und VLC aktualisiert.")
@@ -384,13 +407,23 @@ class SettingsTab(ttk.Frame):
         self.detail.insert("1.0", text)
 
     def show_help(self, key):
-        self._set_help(HELP[key])
+        self._set_help(HELP[key], handbook_anchor=HELP_HANDBOOK_ANCHORS.get(key))
 
-    def _set_help(self, text):
+    def _set_help(self, text, handbook_anchor: str | None = None):
+        self._current_help_anchor = handbook_anchor
         self.helpbox.config(state="normal")
         self.helpbox.delete("1.0", "end")
         self.helpbox.insert("1.0", text)
         self.helpbox.config(state="disabled")
+        self.help_handbook_btn.configure(state="normal" if handbook_anchor else "disabled")
+
+    def open_current_help_anchor(self):
+        if not self._current_help_anchor:
+            return
+        try:
+            self.app.open_handbook(self._current_help_anchor)
+        except Exception:
+            pass
 
     def run_install_cmd(self):
         cmd = self.environment_service.get_install_command()
@@ -399,13 +432,15 @@ class SettingsTab(ttk.Frame):
             self._set_general_commands_text(resolve_cuda_paths=False)
             self._set_help(
                 "Ein neues CMD-Fenster wurde geöffnet und der Installationsbefehl wurde dort gestartet. "
-                "Das Fenster bleibt offen, damit Sie die Ausgabe und eventuelle Fehlermeldungen lesen können."
+                "Das Fenster bleibt offen, damit Sie die Ausgabe und eventuelle Fehlermeldungen lesen können.",
+                handbook_anchor="13.7 Installations-CMD, CUDA-/PATH-CMD und Zusatzpfade",
             )
             self.app.set_status("Installations-CMD in neuem Fenster gestartet.")
         except Exception as exc:
             self._set_help(
                 "Der Installationsbefehl konnte nicht automatisch gestartet werden. "
-                f"Fehler: {exc}"
+                f"Fehler: {exc}",
+                handbook_anchor="13.7 Installations-CMD, CUDA-/PATH-CMD und Zusatzpfade",
             )
             self.app.set_status(f"Installations-CMD konnte nicht gestartet werden: {exc}")
 
@@ -414,7 +449,8 @@ class SettingsTab(ttk.Frame):
         self.clipboard_append(self.environment_service.get_install_command())
         self._set_general_commands_text(resolve_cuda_paths=False)
         self._set_help(
-            "Der Installationsbefehl wurde kopiert. Sie sehen ihn zusätzlich links im Detailbereich und können ihn dort direkt prüfen."
+            "Der Installationsbefehl wurde kopiert. Sie sehen ihn zusätzlich links im Detailbereich und können ihn dort direkt prüfen.",
+            handbook_anchor="13.7 Installations-CMD, CUDA-/PATH-CMD und Zusatzpfade",
         )
 
     def copy_path(self):
@@ -424,5 +460,6 @@ class SettingsTab(ttk.Frame):
         self._set_general_commands_text(resolve_cuda_paths=True)
         self._set_help(
             "Der CUDA-/PATH-Befehl wurde kopiert. Damit können erkannte CUDA-Ordner für die aktuelle Kommandozeile in den Pfad gesetzt werden, "
-            "damit GPU-Dateien leichter gefunden werden."
+            "damit GPU-Dateien leichter gefunden werden.",
+            handbook_anchor="13.7 Installations-CMD, CUDA-/PATH-CMD und Zusatzpfade",
         )

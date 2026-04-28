@@ -68,3 +68,7 @@ desktop.ini
 
 # Local Word working copies of manuals
 *.docx
+
+# Generated handbook exports
+docs/Bleepling_Benutzerhandbuch.html
+docs/Bleepling_Benutzerhandbuch.pdf
